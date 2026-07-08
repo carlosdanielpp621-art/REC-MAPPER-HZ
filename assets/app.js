@@ -9,11 +9,97 @@ const DISCORD_WEBHOOKS = {
 };
 const STORAGE_KEY = "recmapper.submissions";
 
+/* ---------- Navegação/Auth ---------- */
+const HOME_URL = "/inicio.html";
+const LOGIN_URL = "/login.html";
+const REGISTRO_URL = "/registro.html";
+
+function isSupabaseAuthKey(k){
+  return /^sb-.*-auth-token$/.test(String(k||""));
+}
+function clearStoredAuth(){
+  try {
+    [window.localStorage, window.sessionStorage].forEach((storage) => {
+      if(!storage) return;
+      Object.keys(storage).forEach((k) => {
+        if(isSupabaseAuthKey(k)) storage.removeItem(k);
+      });
+    });
+  } catch(e) { /* ignore */ }
+}
+function markInternalNavigation(){
+  try { sessionStorage.setItem("recmapper.internalNavigation", "1"); } catch(e){}
+}
+function goHome(){
+  markInternalNavigation();
+  window.location.href = HOME_URL;
+}
+function goRegistro(){
+  markInternalNavigation();
+  window.location.href = REGISTRO_URL;
+}
+function navigateTo(url){
+  markInternalNavigation();
+  window.location.href = url;
+}
+function consumeInternalNavigationFlag(){
+  let internal = false;
+  try {
+    internal = sessionStorage.getItem("recmapper.internalNavigation") === "1";
+    sessionStorage.removeItem("recmapper.internalNavigation");
+  } catch(e){}
+  return internal;
+}
+
+// Remove sessões antigas que ficaram salvas no localStorage em versões anteriores.
+// Isso precisa acontecer antes de criar o client para o site não abrir já logado.
+try {
+  if (typeof window !== "undefined" && window.localStorage) {
+    Object.keys(window.localStorage).forEach((k) => {
+      if (isSupabaseAuthKey(k)) window.localStorage.removeItem(k);
+    });
+  }
+} catch (e) { /* ignore */ }
+
+// Se a aba foi restaurada/reaberta sem navegação interna do próprio site,
+// apaga a sessão temporária para não deixar o usuário preso no Registro.
+try {
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    const internal = consumeInternalNavigationFlag();
+    const justReturnedFromOAuth = /access_token|refresh_token|code|type=recovery/.test(location.href);
+    if (!internal && !justReturnedFromOAuth) {
+      Object.keys(window.sessionStorage).forEach((k) => {
+        if (isSupabaseAuthKey(k)) window.sessionStorage.removeItem(k);
+      });
+    }
+  }
+} catch (e) { /* ignore */ }
+
+try {
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", () => {
+      let internal = false;
+      try { internal = sessionStorage.getItem("recmapper.internalNavigation") === "1"; } catch(e){}
+      if(!internal) clearStoredAuth();
+    });
+  }
+} catch(e) { /* ignore */ }
+
 /* ---------- Supabase ---------- */
 const SUPABASE_URL = "https://kbjlmdkjntihvmewgkzd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiamxtZGtqbnRpaHZtZXdna3pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwOTU5MTUsImV4cCI6MjA5ODY3MTkxNX0.PNsi4v9j4MpOesjvZtoxbQA3bRzMM2-Y4EvYjy4AFhs";
+// IMPORTANTE: usamos sessionStorage (em vez de localStorage) para que a sessão
+// do usuário NÃO persista entre fechamentos do navegador. Ao fechar o site e
+// reabrir, o usuário precisa fazer login novamente para acessar o painel.
 const sb = (typeof window !== "undefined" && window.supabase)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storage: window.sessionStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   : null;
 
 /* ---------- Utils ---------- */
@@ -56,16 +142,28 @@ function isSuperAdmin(){
 function isRootSuperAdmin(){ return (CURRENT_USER?.email||"").toLowerCase() === SUPER_ADMIN_EMAIL; }
 function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsavel"; }
 
+
+function goToLogin(returnTo){
+  const target = returnTo || location.href;
+  try { sessionStorage.setItem("recmapper.loginFrom", target); } catch(e){}
+  markInternalNavigation();
+  window.location.href = LOGIN_URL;
+}
+
 async function signInGoogle(){
   if(!sb) return;
+  markInternalNavigation();
   await sb.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin + "/home.html" }
+    options: { redirectTo: window.location.origin + REGISTRO_URL }
   });
 }
 async function signOut(){
-  if(sb) await sb.auth.signOut();
-  window.location.href = "/home.html";
+  try { if(sb) await sb.auth.signOut(); } catch(e){ console.warn(e); }
+  CURRENT_USER = null; CURRENT_ROLE = null; CURRENT_SERVIDOR = null;
+  try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
+  clearStoredAuth();
+  goHome();
 }
 
 /* ---------- Toast ---------- */
@@ -116,7 +214,7 @@ function renderPanel({active="inicio"}={}){
       <div class="avatar" title="${user?escapeHtml(user.email):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
       ${user
         ? `<button class="icon-btn" id="logoutBtn" title="Sair">${icon("log-out")}</button>`
-        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login.html'">${icon("log-in")}</button>`}
+        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="goToLogin(REGISTRO_URL)">${icon("log-in")}</button>`}
     </div>
   </header>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -125,13 +223,13 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/home.html'">
+          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="goHome()">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>
         ${showRegistro?`
         <div class="nav-item">
-          <button class="nav-btn ${active==="registro"?"active":""}" onclick="location.href='/registro.html'">
+          <button class="nav-btn ${active==="registro"?"active":""}" onclick="goRegistro()">
             <span class="nav-icon">${icon("clipboard-list")}</span><span class="nav-label">Registro</span>
           </button>
         </div>`:""}
@@ -553,7 +651,7 @@ async function loadNotifications(){
         const id = el.getAttribute("data-id");
         const fid = el.getAttribute("data-form");
         try{ await sb.from("notifications").update({lida:true}).eq("id",id); }catch{}
-        if(fid) location.href = `/detalhe.html?id=${fid}`;
+        if(fid) navigateTo(`/detalhe.html?id=${fid}`);
         else loadNotifications();
       };
     });

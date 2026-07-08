@@ -19,7 +19,7 @@ function labelStatus(s){return {pending:"Pendente",approved:"Aprovado",rejected:
 
 async function bootstrap(){
   await refreshAuth();
-  if(!CURRENT_USER){ location.href="/login.html"; return; }
+  if(!CURRENT_USER){ goToLogin(location.href); return; }
   if(!isMapper()){
     renderPanel({active:"registro"});
     document.getElementById("main-content").innerHTML = `<div class="card"><h1>Acesso negado</h1><p class="subtitle">Sua conta não possui cargo autorizado.</p></div>`;
@@ -37,7 +37,7 @@ async function load(){
 }
 
 function render(){
-  if(!sub){document.getElementById("main-content").innerHTML=`<div class="card"><h1>Inscrição não encontrada</h1><div class="btn-group"><button class="btn btn-outline" onclick="location.href='/registro.html'">Voltar</button></div></div>`;return}
+  if(!sub){document.getElementById("main-content").innerHTML=`<div class="card"><h1>Inscrição não encontrada</h1><div class="btn-group"><button class="btn btn-outline" onclick="goRegistro()">Voltar</button></div></div>`;return}
   const rows=[
     ["E-mail *",sub.email],["Selecione o servidor *",sub.servidor],["Nick *",sub.nick],
     ["RG *",sub.rg],["Discord *",sub.discord],["Número *",sub.numero],
@@ -72,7 +72,7 @@ function render(){
         ${rows.map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
       </div>
       <div class="btn-group">
-        <button class="btn btn-outline" onclick="location.href='/registro.html'">${icon("arrow-left")} Voltar</button>
+        <button class="btn btn-outline" onclick="goRegistro()">${icon("arrow-left")} Voltar</button>
         ${sub.status==="pending"?`
           <button class="btn btn-success" id="btnApprove">${icon("check")} Aprovar</button>
           <button class="btn btn-danger"  id="btnReject">${icon("x")} Recusar</button>`:""}
@@ -105,7 +105,7 @@ function render(){
   const copyBtn=document.getElementById("btnCopy");
   if(copyBtn) copyBtn.onclick=copyForm;
   const editBtn=document.getElementById("btnEdit");
-  if(editBtn) editBtn.onclick=()=>location.href=`/formulario.html?edit=${sub.id}`;
+  if(editBtn) editBtn.onclick=()=>navigateTo(`/formulario.html?edit=${sub.id}`);
 }
 
 async function decide(status){
@@ -123,7 +123,7 @@ async function deleteSub(){
     await deleteFormularioSupabase(sub.id);
     await createNotification({tipo:"deleted",titulo:"Formulário excluído",mensagem:`${sub.nick||"—"} (${sub.servidor||"—"}) foi excluído`,formulario_id:sub.id,ator:CURRENT_USER?.email});
     toast("Formulário excluído","success");
-    setTimeout(()=>location.href="/registro.html", 500);
+    setTimeout(()=>goRegistro(), 500);
   }catch(e){
     console.error(e);
     toast(e.message||"Erro ao excluir","error");
