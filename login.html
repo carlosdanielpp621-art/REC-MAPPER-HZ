@@ -29,18 +29,24 @@
 </div>
 <script>
 function goBackOrHome(){
+  // 1) Preferir a URL salva quando o usuário clicou em "Entrar" no painel
+  let saved = "";
+  try { saved = sessionStorage.getItem("recmapper.loginFrom") || ""; } catch(e){}
+  if(saved && saved.startsWith(location.origin) && saved !== location.href){
+    try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
+    navigateTo(saved);
+    return;
+  }
+  // 2) Referrer interno (mesma origem)
   const referrer = document.referrer && document.referrer.startsWith(location.origin)
     ? document.referrer
     : "";
   if(referrer && referrer !== location.href){
-    window.location.href = referrer;
+    navigateTo(referrer);
     return;
   }
-  if(window.history.length > 1){
-    window.history.back();
-  } else {
-    window.location.href = "/index.html";
-  }
+  // 3) Fallback: página inicial
+  goHome();
 }
 
 document.getElementById("btnGoogle").onclick = signInGoogle;
@@ -53,7 +59,7 @@ document.getElementById("btnBack").onclick = goBackOrHome;
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
     // Após login, redireciona para a página de Registro (mappers)
-    setTimeout(()=>location.href="/registro.html", 1201);
+    setTimeout(()=>goRegistro(), 1201);
   }
 })();
 </script>
