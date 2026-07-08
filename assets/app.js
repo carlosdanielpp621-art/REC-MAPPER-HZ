@@ -56,6 +56,12 @@ function isSuperAdmin(){
 function isRootSuperAdmin(){ return (CURRENT_USER?.email||"").toLowerCase() === SUPER_ADMIN_EMAIL; }
 function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsavel"; }
 
+
+function goToLogin(){
+  try { sessionStorage.setItem("recmapper.loginFrom", location.href); } catch(e){}
+  window.location.href = "/login.html";
+}
+
 async function signInGoogle(){
   if(!sb) return;
   await sb.auth.signInWithOAuth({
@@ -64,7 +70,9 @@ async function signInGoogle(){
   });
 }
 async function signOut(){
-  if(sb) await sb.auth.signOut();
+  try { if(sb) await sb.auth.signOut(); } catch(e){ console.warn(e); }
+  CURRENT_USER = null; CURRENT_ROLE = null; CURRENT_SERVIDOR = null;
+  try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
   window.location.href = "/index.html";
 }
 
@@ -116,7 +124,7 @@ function renderPanel({active="inicio"}={}){
       <div class="avatar" title="${user?escapeHtml(user.email):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
       ${user
         ? `<button class="icon-btn" id="logoutBtn" title="Sair">${icon("log-out")}</button>`
-        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login.html'">${icon("log-in")}</button>`}
+        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="goToLogin()">${icon("log-in")}</button>`}
     </div>
   </header>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
