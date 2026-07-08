@@ -12,31 +12,9 @@ const STORAGE_KEY = "recmapper.submissions";
 /* ---------- Supabase ---------- */
 const SUPABASE_URL = "https://kbjlmdkjntihvmewgkzd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiamxtZGtqbnRpaHZtZXdna3pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwOTU5MTUsImV4cCI6MjA5ODY3MTkxNX0.PNsi4v9j4MpOesjvZtoxbQA3bRzMM2-Y4EvYjy4AFhs";
-// IMPORTANTE: usamos sessionStorage (em vez de localStorage) para que a sessão
-// do usuário NÃO persista entre fechamentos do navegador. Ao fechar o site e
-// reabrir, o usuário precisa fazer login novamente para acessar o painel.
 const sb = (typeof window !== "undefined" && window.supabase)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        storage: window.sessionStorage,
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    })
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
-
-// Migração: se houver sessão antiga salva em localStorage (versões anteriores
-// do site mantinham o login persistente), removemos para forçar novo login.
-try {
-  if (typeof window !== "undefined" && window.localStorage) {
-    Object.keys(window.localStorage).forEach((k) => {
-      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
-        window.localStorage.removeItem(k);
-      }
-    });
-  }
-} catch (e) { /* ignore */ }
 
 /* ---------- Utils ---------- */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -78,24 +56,16 @@ function isSuperAdmin(){
 function isRootSuperAdmin(){ return (CURRENT_USER?.email||"").toLowerCase() === SUPER_ADMIN_EMAIL; }
 function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsavel"; }
 
-
-function goToLogin(){
-  try { sessionStorage.setItem("recmapper.loginFrom", location.href); } catch(e){}
-  window.location.href = "/login.html";
-}
-
 async function signInGoogle(){
   if(!sb) return;
   await sb.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin + "/registro.html" }
+    options: { redirectTo: window.location.origin + "/home.html" }
   });
 }
 async function signOut(){
-  try { if(sb) await sb.auth.signOut(); } catch(e){ console.warn(e); }
-  CURRENT_USER = null; CURRENT_ROLE = null; CURRENT_SERVIDOR = null;
-  try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
-  window.location.href = "/index.html";
+  if(sb) await sb.auth.signOut();
+  window.location.href = "/home.html";
 }
 
 /* ---------- Toast ---------- */
@@ -146,7 +116,7 @@ function renderPanel({active="inicio"}={}){
       <div class="avatar" title="${user?escapeHtml(user.email):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
       ${user
         ? `<button class="icon-btn" id="logoutBtn" title="Sair">${icon("log-out")}</button>`
-        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="goToLogin()">${icon("log-in")}</button>`}
+        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login.html'">${icon("log-in")}</button>`}
     </div>
   </header>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -155,7 +125,7 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/inicio.html'">
+          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/home.html'">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>
