@@ -31,6 +31,10 @@ function markInternalNavigation(){
   try { sessionStorage.setItem("recmapper.internalNavigation", "1"); } catch(e){}
 }
 function goHome(){
+  if (CURRENT_USER) {
+    goRegistro();
+    return;
+  }
   markInternalNavigation();
   window.location.href = HOME_URL;
 }
@@ -163,7 +167,8 @@ async function signOut(){
   CURRENT_USER = null; CURRENT_ROLE = null; CURRENT_SERVIDOR = null;
   try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
   clearStoredAuth();
-  goHome();
+  markInternalNavigation();
+  window.location.href = LOGIN_URL;
 }
 
 /* ---------- Toast ---------- */
