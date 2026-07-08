@@ -125,7 +125,7 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/registro.html'">
+          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/index.html'">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>
