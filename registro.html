@@ -72,7 +72,7 @@ let loadError="";
 
 async function bootstrap(){
   await refreshAuth();
-  if(!CURRENT_USER){ location.href="/login.html"; return; }
+  if(!CURRENT_USER){ goToLogin(REGISTRO_URL); return; }
   if(!isMapper()){
     renderPanel({active:"registro"});
     document.getElementById("main-content").innerHTML = `
@@ -81,7 +81,7 @@ async function bootstrap(){
         <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_USER.email)}</strong> não possui cargo autorizado.</p>
         <div class="btn-group">
           <button class="btn btn-outline" onclick="signOut()">Sair</button>
-          <button class="btn btn-primary" onclick="location.href='/inicio.html'">Voltar ao início</button>
+          <button class="btn btn-primary" onclick="goHome()">Voltar ao início</button>
         </div>
       </div>`;
     return;
@@ -112,7 +112,7 @@ function render(){
     : (list.length?list.map((s,i)=>`
     <div class="entry" data-id="${s.id}">
       <div class="entry-top">
-        <div class="entry-main" style="cursor:pointer" onclick="location.href='/detalhe.html?id=${s.id}'">
+        <div class="entry-main" style="cursor:pointer" onclick="navigateTo('/detalhe.html?id=${s.id}')">
           <span class="entry-num">${i+1}.</span>
           <div class="meta">
             <span class="name">${escapeHtml(s.nick||"—")} <span style="color:var(--muted);font-weight:400">· ${escapeHtml(s.servidor||"")}</span></span>
