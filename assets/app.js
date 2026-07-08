@@ -12,9 +12,31 @@ const STORAGE_KEY = "recmapper.submissions";
 /* ---------- Supabase ---------- */
 const SUPABASE_URL = "https://kbjlmdkjntihvmewgkzd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiamxtZGtqbnRpaHZtZXdna3pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwOTU5MTUsImV4cCI6MjA5ODY3MTkxNX0.PNsi4v9j4MpOesjvZtoxbQA3bRzMM2-Y4EvYjy4AFhs";
+// IMPORTANTE: usamos sessionStorage (em vez de localStorage) para que a sessão
+// do usuário NÃO persista entre fechamentos do navegador. Ao fechar o site e
+// reabrir, o usuário precisa fazer login novamente para acessar o painel.
 const sb = (typeof window !== "undefined" && window.supabase)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storage: window.sessionStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   : null;
+
+// Migração: se houver sessão antiga salva em localStorage (versões anteriores
+// do site mantinham o login persistente), removemos para forçar novo login.
+try {
+  if (typeof window !== "undefined" && window.localStorage) {
+    Object.keys(window.localStorage).forEach((k) => {
+      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        window.localStorage.removeItem(k);
+      }
+    });
+  }
+} catch (e) { /* ignore */ }
 
 /* ---------- Utils ---------- */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -133,7 +155,7 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/index.html'">
+          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/inicio.html'">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>

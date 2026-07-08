@@ -27,7 +27,7 @@ let existingSub = null;
           <h1>🔒 Formulário trancado</h1>
           <p class="subtitle">As inscrições estão temporariamente encerradas. Aguarde a reabertura.</p>
           <div class="btn-group">
-            <button class="btn btn-outline" onclick="location.href='/index.html'">Voltar ao início</button>
+            <button class="btn btn-outline" onclick="location.href='/inicio.html'">Voltar ao início</button>
           </div>
         </div>`;
       return;
@@ -129,7 +129,7 @@ function renderForm(){
 
         <div class="btn-group">
           <button type="submit" class="btn btn-primary">${icon("send")} ${EDIT_ID?"Salvar alterações":"Enviar"}</button>
-          <button type="button" class="btn btn-outline" onclick="location.href='${EDIT_ID?`detalhe.html?id=${EDIT_ID}`:'/index.html'}'">Cancelar</button>
+          <button type="button" class="btn btn-outline" onclick="location.href='${EDIT_ID?`detalhe.html?id=${EDIT_ID}`:'/inicio.html'}'">Cancelar</button>
         </div>
       </form>
     </div>
