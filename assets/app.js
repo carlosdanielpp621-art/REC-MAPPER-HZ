@@ -65,7 +65,7 @@ async function signInGoogle(){
 }
 async function signOut(){
   if(sb) await sb.auth.signOut();
-  window.location.href = "/registro.html";
+  window.location.href = "/index.html";
 }
 
 /* ---------- Toast ---------- */

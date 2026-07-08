@@ -36,8 +36,8 @@ document.getElementById("btnGoogle").onclick = signInGoogle;
       `Você já está logado como <strong>${CURRENT_USER.email}</strong>` +
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
-    // Após login, redireciona para a página de Registro (mappers) ou Home
-    setTimeout(()=>location.href="/registro.html", 1200);
+    // Após login, redireciona para a página de Registro (mappers)
+    setTimeout(()=>location.href="/registro.html", 1201);
   }
 })();
 </script>
