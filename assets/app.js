@@ -79,6 +79,14 @@ function isRootSuperAdmin(){ return (CURRENT_USER?.email||"").toLowerCase() === 
 function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsavel"; }
 
 
+function goToHome(){
+  window.location.href = "/inicio.html";
+}
+
+function goToRegistro(){
+  window.location.href = "/registro.html";
+}
+
 function goToLogin(){
   try { sessionStorage.setItem("recmapper.loginFrom", location.href); } catch(e){}
   window.location.href = "/login.html";
@@ -88,14 +96,14 @@ async function signInGoogle(){
   if(!sb) return;
   await sb.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin + "/registro.html" }
+    options: { redirectTo: window.location.origin + "/inicio.html" }
   });
 }
 async function signOut(){
   try { if(sb) await sb.auth.signOut(); } catch(e){ console.warn(e); }
   CURRENT_USER = null; CURRENT_ROLE = null; CURRENT_SERVIDOR = null;
   try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
-  window.location.href = "/index.html";
+  goToHome();
 }
 
 /* ---------- Toast ---------- */
@@ -155,13 +163,13 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/inicio.html'">
+          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="goToHome()">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>
         ${showRegistro?`
         <div class="nav-item">
-          <button class="nav-btn ${active==="registro"?"active":""}" onclick="location.href='/registro.html'">
+          <button class="nav-btn ${active==="registro"?"active":""}" onclick="goToRegistro()">
             <span class="nav-icon">${icon("clipboard-list")}</span><span class="nav-label">Registro</span>
           </button>
         </div>`:""}
