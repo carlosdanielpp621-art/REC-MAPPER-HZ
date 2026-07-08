@@ -129,7 +129,7 @@ function renderForm(){
 
         <div class="btn-group">
           <button type="submit" class="btn btn-primary">${icon("send")} ${EDIT_ID?"Salvar alterações":"Enviar"}</button>
-          <button type="button" class="btn btn-outline" onclick="location.href='${EDIT_ID?`detalhe.html?id=${EDIT_ID}`:'index.html'}'">Cancelar</button>
+          <button type="button" class="btn btn-outline" onclick="location.href='${EDIT_ID?`detalhe.html?id=${EDIT_ID}`:'/index.html'}'">Cancelar</button>
         </div>
       </form>
     </div>
