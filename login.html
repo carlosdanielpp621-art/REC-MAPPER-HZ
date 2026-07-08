@@ -22,18 +22,13 @@
     </p>
     <div class="btn-group" style="justify-content:center;margin-top:1.25rem">
       <button class="btn btn-primary" id="btnGoogle">Entrar com Google</button>
-      <button class="btn btn-outline" id="btnBack">Voltar</button>
+      <button class="btn btn-outline" onclick="location.href='/home.html'">Voltar</button>
     </div>
     <p id="statusMsg" class="subtitle" style="text-align:center;margin-top:1rem"></p>
   </div>
 </div>
 <script>
-function goBackOrHome(){
-  window.location.href = "/inicio.html";
-}
-
 document.getElementById("btnGoogle").onclick = signInGoogle;
-document.getElementById("btnBack").onclick = goBackOrHome;
 (async ()=>{
   await refreshAuth();
   if(CURRENT_USER){
@@ -41,9 +36,13 @@ document.getElementById("btnBack").onclick = goBackOrHome;
       `Você já está logado como <strong>${CURRENT_USER.email}</strong>` +
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
-    setTimeout(()=>location.href="/inicio.html", 1201);
+    // Após login, redireciona para a página de Registro (mappers) ou Home
+    if(isMapper()) setTimeout(()=>location.href="/registro.html", 1200);
+    else setTimeout(()=>location.href="/home.html", 1500);
   }
 })();
+</script>
+
 </script>
 </body>
 </html>
