@@ -1,13 +1,4 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false,
-  "redirects": [
-    { "source": "/index.html",     "destination": "/",          "permanent": true },
-    { "source": "/home.html",      "destination": "/",          "permanent": true },
-    { "source": "/detalhe.html",   "destination": "/detalhe",   "permanent": true },
-    { "source": "/formulario.html","destination": "/formulario","permanent": true },
-    { "source": "/login.html",     "destination": "/login",     "permanent": true },
-    { "source": "/registro.html",  "destination": "/registro",  "permanent": true },
-    { "source": "/sucesso.html",   "destination": "/sucesso",   "permanent": true }
-  ]
+  "trailingSlash": false
 }

@@ -22,7 +22,7 @@
     </p>
     <div class="btn-group" style="justify-content:center;margin-top:1.25rem">
       <button class="btn btn-primary" id="btnGoogle">Entrar com Google</button>
-      <button class="btn btn-outline" onclick="location.href='/'">Voltar</button>
+      <button class="btn btn-outline" onclick="location.href='/registro.html'">Voltar</button>
     </div>
     <p id="statusMsg" class="subtitle" style="text-align:center;margin-top:1rem"></p>
   </div>
@@ -37,7 +37,7 @@ document.getElementById("btnGoogle").onclick = signInGoogle;
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
     // Após login, redireciona para a página de Registro (mappers) ou Home
-    setTimeout(()=>location.href="/registro", 1200);
+    setTimeout(()=>location.href="/registro.html", 1200);
   }
 })();
 </script>

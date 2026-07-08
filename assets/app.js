@@ -60,12 +60,12 @@ async function signInGoogle(){
   if(!sb) return;
   await sb.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin + "/" }
+    options: { redirectTo: window.location.origin + "/registro.html" }
   });
 }
 async function signOut(){
   if(sb) await sb.auth.signOut();
-  window.location.href = "/";
+  window.location.href = "/registro.html";
 }
 
 /* ---------- Toast ---------- */
@@ -116,7 +116,7 @@ function renderPanel({active="inicio"}={}){
       <div class="avatar" title="${user?escapeHtml(user.email):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
       ${user
         ? `<button class="icon-btn" id="logoutBtn" title="Sair">${icon("log-out")}</button>`
-        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login'">${icon("log-in")}</button>`}
+        : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login.html'">${icon("log-in")}</button>`}
     </div>
   </header>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -125,13 +125,13 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/'">
+          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="location.href='/registro.html'">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>
         ${showRegistro?`
         <div class="nav-item">
-          <button class="nav-btn ${active==="registro"?"active":""}" onclick="location.href='/registro'">
+          <button class="nav-btn ${active==="registro"?"active":""}" onclick="location.href='/registro.html'">
             <span class="nav-icon">${icon("clipboard-list")}</span><span class="nav-label">Registro</span>
           </button>
         </div>`:""}
@@ -553,7 +553,7 @@ async function loadNotifications(){
         const id = el.getAttribute("data-id");
         const fid = el.getAttribute("data-form");
         try{ await sb.from("notifications").update({lida:true}).eq("id",id); }catch{}
-        if(fid) location.href = `/detalhe?id=${fid}`;
+        if(fid) location.href = `/detalhe.html?id=${fid}`;
         else loadNotifications();
       };
     });
