@@ -14,15 +14,11 @@
 <script>
 (async ()=>{
   await refreshAuth();
-  if(CURRENT_USER){
-    goRegistro();
-    return;
-  }
   renderPanel({active:"inicio"});
   const locked = await isFormLocked();
   const btn = locked
     ? `<button class="btn btn-primary" disabled title="Formulário trancado" style="opacity:.5;cursor:not-allowed">🔒 Formulário Trancado</button>`
-    : `<button class="btn btn-primary" onclick="navigateTo('/formulario.html')">Concordo</button>`;
+    : `<button class="btn btn-primary" onclick="location.href='formulario'">Concordo</button>`;
   const lockNotice = locked
     ? `<div style="margin-top:1rem;padding:1rem;border-radius:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca">
          <strong>🔒 As inscrições estão temporariamente trancadas.</strong><br>

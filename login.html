@@ -34,7 +34,7 @@ function goBackOrHome(){
   try { saved = sessionStorage.getItem("recmapper.loginFrom") || ""; } catch(e){}
   if(saved && saved.startsWith(location.origin) && saved !== location.href){
     try { sessionStorage.removeItem("recmapper.loginFrom"); } catch(e){}
-    navigateTo(saved);
+    window.location.href = saved;
     return;
   }
   // 2) Referrer interno (mesma origem)
@@ -42,11 +42,11 @@ function goBackOrHome(){
     ? document.referrer
     : "";
   if(referrer && referrer !== location.href){
-    navigateTo(referrer);
+    window.location.href = referrer;
     return;
   }
   // 3) Fallback: página inicial
-  goHome();
+  window.location.href = "/inicio.html";
 }
 
 document.getElementById("btnGoogle").onclick = signInGoogle;
@@ -59,7 +59,7 @@ document.getElementById("btnBack").onclick = goBackOrHome;
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
     // Após login, redireciona para a página de Registro (mappers)
-    setTimeout(()=>goRegistro(), 1201);
+    setTimeout(()=>location.href="/registro.html", 1201);
   }
 })();
 </script>

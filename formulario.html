@@ -27,7 +27,7 @@ let existingSub = null;
           <h1>🔒 Formulário trancado</h1>
           <p class="subtitle">As inscrições estão temporariamente encerradas. Aguarde a reabertura.</p>
           <div class="btn-group">
-            <button class="btn btn-outline" onclick="goHome()">Voltar ao início</button>
+            <button class="btn btn-outline" onclick="location.href='/inicio.html'">Voltar ao início</button>
           </div>
         </div>`;
       return;
@@ -36,7 +36,7 @@ let existingSub = null;
 
   if(EDIT_ID){
     if(!CURRENT_USER || !isMapper()){
-      goToLogin(location.href); return;
+      location.href="/login.html"; return;
     }
     try{ existingSub = await loadSubFromSupabase(EDIT_ID); }catch(e){ console.warn(e); }
   }
@@ -129,7 +129,7 @@ function renderForm(){
 
         <div class="btn-group">
           <button type="submit" class="btn btn-primary">${icon("send")} ${EDIT_ID?"Salvar alterações":"Enviar"}</button>
-          <button type="button" class="btn btn-outline" onclick="navigateTo('${EDIT_ID?`/detalhe.html?id=${EDIT_ID}`:HOME_URL}')">Cancelar</button>
+          <button type="button" class="btn btn-outline" onclick="location.href='${EDIT_ID?`detalhe.html?id=${EDIT_ID}`:'/inicio.html'}'">Cancelar</button>
         </div>
       </form>
     </div>
@@ -147,7 +147,7 @@ function renderForm(){
         await updateFormularioSupabase(EDIT_ID, data);
         await createNotification({tipo:"edited",titulo:"Formulário editado",mensagem:`${data.nick||"—"} teve o formulário editado`,formulario_id:EDIT_ID,ator:CURRENT_USER?.email});
         toast("Alterações salvas","success");
-        navigateTo(`/detalhe.html?id=${EDIT_ID}`);
+        location.href = `detalhe.html?id=${EDIT_ID}`;
       }catch(err){
         console.error(err);
         toast("Erro ao salvar: "+(err.message||"tente novamente"),"error");
@@ -172,7 +172,7 @@ function renderForm(){
     const list=loadSubs();list.unshift(sub);saveSubs(list);
     await sendDiscord(sub,"new");
     toast("Formulário enviado com sucesso!","success",2200);
-    setTimeout(()=>{ navigateTo("/sucesso.html"); }, 1400);
+    setTimeout(()=>{ location.href="sucesso.html"; }, 1400);
 
   });
 }
