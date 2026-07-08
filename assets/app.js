@@ -80,11 +80,11 @@ function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsa
 
 
 function goToHome(){
-  window.location.href = "/inicio.html";
+  window.location.assign("/inicio.html");
 }
 
 function goToRegistro(){
-  window.location.href = "/registro.html";
+  window.location.assign("/registro.html");
 }
 
 function goToLogin(){
@@ -163,13 +163,13 @@ function renderPanel({active="inicio"}={}){
       <div class="nav-section">Navegação</div>
       <nav class="nav-list">
         <div class="nav-item">
-          <button class="nav-btn ${active==="inicio"?"active":""}" onclick="goToHome()">
+          <button type="button" class="nav-btn ${active==="inicio"?"active":""}" data-route="/inicio.html">
             <span class="nav-icon">${icon("home")}</span><span class="nav-label">Início</span>
           </button>
         </div>
         ${showRegistro?`
         <div class="nav-item">
-          <button class="nav-btn ${active==="registro"?"active":""}" onclick="goToRegistro()">
+          <button type="button" class="nav-btn ${active==="registro"?"active":""}" data-route="/registro.html">
             <span class="nav-icon">${icon("clipboard-list")}</span><span class="nav-label">Registro</span>
           </button>
         </div>`:""}
@@ -198,10 +198,14 @@ function renderPanel({active="inicio"}={}){
     sidebarEl.classList.add("collapsed");
     backdrop.classList.remove("show");
   };
-  // Fecha o drawer ao navegar
+  // Fecha o drawer ao navegar e garante o destino correto da navegação
   sidebarEl.querySelectorAll(".nav-btn").forEach(b=>{
-    const orig = b.onclick;
-    b.addEventListener("click",()=>{ if(isMobile()){ sidebarEl.classList.remove("open"); backdrop.classList.remove("show"); }});
+    b.addEventListener("click",(e)=>{
+      e.preventDefault();
+      const route = b.getAttribute("data-route");
+      if(route){ window.location.assign(route); }
+      if(isMobile()){ sidebarEl.classList.remove("open"); backdrop.classList.remove("show"); }
+    });
   });
   if(showNotif){
     const nb=document.getElementById("notifBtn");
