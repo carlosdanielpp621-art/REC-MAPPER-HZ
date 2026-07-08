@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FORM.UCP — Formulário Setor Mappers</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div id="panel-root"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const EDIT_ID = new URLSearchParams(location.search).get("edit");
+let existingSub = null;
+
+(async ()=>{
+  await refreshAuth();
+  renderPanel({active:"inicio"});
+
+  // Bloqueio global (apenas para envio novo, não para edição por mapper)
+  if(!EDIT_ID){
+    const locked = await isFormLocked();
+    if(locked){
+      document.getElementById("main-content").innerHTML = `
+        <div class="card">
+          <h1>🔒 Formulário trancado</h1>
+          <p class="subtitle">As inscrições estão temporariamente encerradas. Aguarde a reabertura.</p>
+          <div class="btn-group">
+            <button class="btn btn-outline" onclick="location.href='home.html'">Voltar ao início</button>
+          </div>
+        </div>`;
+      return;
+    }
+  }
+
+  if(EDIT_ID){
+    if(!CURRENT_USER || !isMapper()){
+      location.href="/login.html"; return;
+    }
+    try{ existingSub = await loadSubFromSupabase(EDIT_ID); }catch(e){ console.warn(e); }
+  }
+
+  renderForm();
+})();
+
+function val(name){ return existingSub && existingSub[name] != null ? String(existingSub[name]) : ""; }
+function isChecked(name,value){
+  if(!existingSub) return false;
+  return String(existingSub[name]||"").toLowerCase() === String(value).toLowerCase();
+}
+
+function renderForm(){
+  const titulo = EDIT_ID ? "Editar Formulário" : "Formulário Setor Mappers";
+  const sub = EDIT_ID ? `Editando respostas do usuário — as alterações serão salvas no registro.` : "Preencha com atenção — todas as informações devem corresponder à sua conta na cidade.";
+  document.getElementById("main-content").innerHTML = `
+    <div class="card">
+      <h1>${titulo}</h1>
+      <p class="subtitle">${sub}</p>
+      <span class="server-badge">● ${EDIT_ID?"Modo edição":"Inscrição oficial"}</span>
+
+      <form id="formMapper" style="margin-top:1.5rem" novalidate>
+        <div class="form-grid">
+          <div class="field full"><label>E-mail *</label><input required type="email" name="email" value="${escapeHtml(val('email'))}" /></div>
+
+          <div class="field"><label>Selecione o servidor *</label>
+            <select required name="servidor">
+              <option value="">Servidor</option>
+              ${["Servidor 1","Servidor 2","Servidor 3","Servidor 4","Servidor 5"].map(sv=>`<option ${val('servidor')===sv?'selected':''}>${sv}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field"><label>Nick *</label><input required name="nick" value="${escapeHtml(val('nick'))}" /></div>
+
+          <div class="field"><label>RG *</label><input required name="rg" value="${escapeHtml(val('rg'))}" /></div>
+          <div class="field"><label>Discord *</label><input required name="discord" placeholder="usuario#0000 ou @usuario" value="${escapeHtml(val('discord'))}" /></div>
+
+          <div class="field"><label>Número *</label><input required name="numero" value="${escapeHtml(val('numero'))}" /></div>
+          <div class="field"><label>Idade *</label><input required type="number" min="1" name="idade" value="${escapeHtml(val('idade'))}" /></div>
+
+          <div class="field"><label>Level *</label><input required name="level" value="${escapeHtml(val('level'))}" /></div>
+
+          <div class="field full"><label>ORG / CORP *</label>
+            <div class="radio-group">
+              ${["Organização","Corporação","Civil","Família"].map((v,i)=>`<label><input ${i===0?'required':''} type="radio" name="orgCorp" value="${v}" ${isChecked('orgCorp',v)?'checked':''}/> ${v}</label>`).join("")}
+            </div>
+          </div>
+
+          <div class="field full"><label>Plataforma *</label>
+            <div class="radio-group">
+              ${["Computador","Notebook"].map((v,i)=>`<label><input ${i===0?'required':''} type="radio" name="plataforma" value="${v}" ${isChecked('plataforma',v)?'checked':''}/> ${v}</label>`).join("")}
+            </div>
+          </div>
+
+          <div class="field full"><label>Descreva como você realiza o seu Roleplay (RP) dentro da cidade *</label>
+            <textarea required name="rp">${escapeHtml(val('rp'))}</textarea></div>
+
+          <div class="field"><label>Tem experiência com mapeação? *</label>
+            <div class="radio-group">
+              ${["Sim","Não"].map((v,i)=>`<label><input ${i===0?'required':''} type="radio" name="expMap" value="${v}" ${isChecked('expMap',v)?'checked':''}/> ${v}</label>`).join("")}
+            </div>
+          </div>
+          <div class="field"><label>Tem experiência em administração? *</label>
+            <div class="radio-group">
+              ${["Sim","Não"].map((v,i)=>`<label><input ${i===0?'required':''} type="radio" name="expAdm" value="${v}" ${isChecked('expAdm',v)?'checked':''}/> ${v}</label>`).join("")}
+            </div>
+          </div>
+
+          <div class="field full"><label>Por que você deseja fazer parte do setor Mapper? *</label>
+            <textarea required name="motivo">${escapeHtml(val('motivo'))}</textarea></div>
+
+          <div class="field full"><label>Qual é o seu nível de conhecimento em mapeamento? *</label>
+            <div class="radio-group">
+              ${["Iniciante","Intermediário","Avançado"].map((v,i)=>`<label><input ${i===0?'required':''} type="radio" name="nivel" value="${v}" ${isChecked('nivel',v)?'checked':''}/> ${v}</label>`).join("")}
+            </div>
+          </div>
+
+          <div class="field full"><label>Há quanto tempo você joga em nossa cidade? *</label>
+            <input required name="tempoCidade" value="${escapeHtml(val('tempoCidade'))}" /></div>
+
+          <div class="field full"><label>Na sua opinião, quais características são essenciais para um bom Mapper? *</label>
+            <textarea required name="caracteristicas">${escapeHtml(val('caracteristicas'))}</textarea></div>
+
+          <div class="field full"><label>Você se considera responsável para lidar com propriedades de alto valor? Justifique. *</label>
+            <textarea required name="responsabilidade">${escapeHtml(val('responsabilidade'))}</textarea></div>
+
+          <div class="field full"><label>Como você agiria caso cometesse um erro no mapeamento de uma casa? *</label>
+            <textarea required name="erro">${escapeHtml(val('erro'))}</textarea></div>
+        </div>
+
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">${icon("send")} ${EDIT_ID?"Salvar alterações":"Enviar"}</button>
+          <button type="button" class="btn btn-outline" onclick="location.href='${EDIT_ID?`detalhe.html?id=${EDIT_ID}`:'home.html'}'">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.getElementById("formMapper").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const f=e.target;
+    if(!f.checkValidity()){f.reportValidity();return}
+    const data=Object.fromEntries(new FormData(f).entries());
+    const btn=f.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Enviando...";
+
+    if(EDIT_ID){
+      try{
+        await updateFormularioSupabase(EDIT_ID, data);
+        await createNotification({tipo:"edited",titulo:"Formulário editado",mensagem:`${data.nick||"—"} teve o formulário editado`,formulario_id:EDIT_ID,ator:CURRENT_USER?.email});
+        toast("Alterações salvas","success");
+        location.href = `detalhe.html?id=${EDIT_ID}`;
+      }catch(err){
+        console.error(err);
+        toast("Erro ao salvar: "+(err.message||"tente novamente"),"error");
+        btn.disabled=false;btn.innerHTML=`${icon("send")} Salvar alterações`;
+      }
+      return;
+    }
+
+    data.ip = await getUserIp();
+    data.navegador = getUserAgent();
+    data.status = "pending";
+    const sub={id:uid(),createdAt:Date.now(),...data};
+    try{
+      const saved = await saveToSupabase(data);
+      await createNotification({tipo:"new",titulo:"Nova inscrição",mensagem:`${data.nick||"—"} (${data.servidor||"—"}) enviou um formulário`,formulario_id:saved?.id||null,ator:data.email});
+    }catch(err){
+      console.error(err);
+      toast("Erro ao salvar: "+(err.message||"tente novamente"),"error");
+      btn.disabled=false;btn.innerHTML=`${icon("send")} Enviar`;
+      return;
+    }
+    const list=loadSubs();list.unshift(sub);saveSubs(list);
+    await sendDiscord(sub,"new");
+    toast("Formulário enviado com sucesso!","success",2200);
+    setTimeout(()=>{ location.href="sucesso.html"; }, 1400);
+
+  });
+}
+</script>
+</body>
+</html>
