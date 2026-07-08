@@ -1,4 +1,20 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/detalhe", "destination": "/detalhe.html" },
+    { "source": "/formulario", "destination": "/formulario.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/registro", "destination": "/registro.html" },
+    { "source": "/sucesso", "destination": "/sucesso.html" }
+  ],
+  "redirects": [
+    { "source": "/index.html", "destination": "/", "permanent": true },
+    { "source": "/detalhe.html", "destination": "/detalhe", "permanent": true },
+    { "source": "/formulario.html", "destination": "/formulario", "permanent": true },
+    { "source": "/login.html", "destination": "/login", "permanent": true },
+    { "source": "/registro.html", "destination": "/registro", "permanent": true },
+    { "source": "/sucesso.html", "destination": "/sucesso", "permanent": true }
+  ]
 }
