@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Login — REC Mapper</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
+<div class="center-page">
+  <div class="card login-card">
+    <div style="display:flex;justify-content:center;margin-bottom:.75rem">
+      <img class="brand-logo" src="/assets/logo.svg.png" alt="REC Mapper" />
+    </div>
+    <h1>Acesso Administrativo</h1>
+    <p class="subtitle" style="text-align:center">
+      Faça login com sua conta Google. Somente contas autorizadas como
+      <strong>Responsável Mapper(a)</strong> ou <strong>Auxiliar Mapper(a)</strong>
+      poderão acessar o painel de Registro.
+    </p>
+    <div class="btn-group" style="justify-content:center;margin-top:1.25rem">
+      <button class="btn btn-primary" id="btnGoogle">Entrar com Google</button>
+      <button class="btn btn-outline" onclick="location.href='/'">Voltar</button>
+    </div>
+    <p id="statusMsg" class="subtitle" style="text-align:center;margin-top:1rem"></p>
+  </div>
+</div>
+<script>
+document.getElementById("btnGoogle").onclick = signInGoogle;
+(async ()=>{
+  await refreshAuth();
+  if(CURRENT_USER){
+    document.getElementById("statusMsg").innerHTML =
+      `Você já está logado como <strong>${CURRENT_USER.email}</strong>` +
+      (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
+    toast("Login efetuado com sucesso.","success",2500);
+    // Após login, redireciona para a página de Registro (mappers) ou Home
+    setTimeout(()=>location.href="/registro", 1200);
+  }
+})();
+</script>
+
+</script>
+</body>
+</html>
