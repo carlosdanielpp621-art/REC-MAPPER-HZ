@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ucp</title>
+<meta name="description" content="Formulário oficial para inscrição no setor Mapper do Horizonte Roleplay." />
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div id="panel-root"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async ()=>{
+  await refreshAuth();
+  renderPanel({active:"inicio"});
+  const locked = await isFormLocked();
+  const btn = locked
+    ? `<button class="btn btn-primary" disabled title="Formulário trancado" style="opacity:.5;cursor:not-allowed">🔒 Formulário Trancado</button>`
+    : `<button class="btn btn-primary" onclick="location.href='ucp-formulário'">Concordo</button>`;
+  const lockNotice = locked
+    ? `<div style="margin-top:1rem;padding:1rem;border-radius:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca">
+         <strong>🔒 As inscrições estão temporariamente trancadas.</strong><br>
+         <span class="subtitle" style="color:#fecaca">No momento não é possível enviar novos formulários. Aguarde a reabertura pela equipe.</span>
+       </div>`
+    : "";
+  document.getElementById("main-content").innerHTML = `
+    <div class="card prose">
+      <h1>Formulário para Inscrição do Setor Mapper</h1>
+      <p class="subtitle">Horizonte Roleplay® — Para todos os servidores</p>
+
+      <h2 style="margin-top:1.5rem">Aviso</h2>
+      <p>A função "MAPPER" da administração do Horizonte Roleplay® é exercida somente por PC e tem como responsabilidade e dever manter o controle dos tickets inseridos na categoria "mapeamento" no Discord e manter a ordem dos pedidos; analisar os pedidos e a casa solicitada e verificar a possibilidade de mapeio na mesma; mapear as casas solicitadas de acordo com a vontade do cliente dentro da possibilidade.</p>
+      <p>O setor Mapper é um trabalho voluntário e exige responsabilidade, conhecimento sobre mapeamento, educação e respeito. O formulário do setor Mapper não é recrutamento para o suporte da staff, você não irá ser uma ADM dentro da cidade, você terá apenas a permissão para executar os comandos do setor Mapper durante o mapeamento.</p>
+      <p>Você está sujeito a ser abordado, ser morto ou ser preso pela polícia. O Mapper dentro da cidade é considerado como arquiteto responsável por realizar o mapeamento dos atendimentos via ticket no Discord oficial do servidor. O setor Mapper não é obrigatório e não exige uma quantidade fixa de mapeamentos por dia, porém é necessário comprometimento para se manter no setor.</p>
+      <p>É necessário ser de computador ou notebook e ter uma conta dentro do servidor Horizonte Roleplay para realizar o mapeamento das casas dos jogadores que possuem família VIP.</p>
+      <p>Antes de prosseguir com a área do formulário, fique atento: todas as perguntas devem estar de acordo com as suas informações dentro da cidade. Caso alguma resposta esteja errada, o formulário será reprovado.</p>
+      <p><strong>Ao prosseguir com a inscrição, você está de acordo com a concordância do setor Mapper.</strong></p>
+      ${lockNotice}
+      <div class="btn-group">${btn}</div>
+    </div>
+  `;
+})();
+</script>
+</body>
+</html>
