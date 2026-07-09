@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Inscrição — REC Mapper</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<div id="panel-root"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+const id=new URLSearchParams(location.search).get("id");
+let sub=null;
+let managePanelOpen=false;
+
+function labelStatus(s){return {pending:"Pendente",approved:"Aprovado",rejected:"Recusado"}[s]||s}
+
+async function bootstrap(){
+  await refreshAuth();
+  if(!CURRENT_USER){ location.href="/login.html"; return; }
+  if(!isMapper()){
+    renderPanel({active:"registro"});
+    document.getElementById("main-content").innerHTML = `<div class="card"><h1>Acesso negado</h1><p class="subtitle">Sua conta não possui cargo autorizado.</p></div>`;
+    return;
+  }
+  renderPanel({active:"registro"});
+  await load();
+}
+
+async function load(){
+  document.getElementById("main-content").innerHTML=`<div class="card"><p class="subtitle">Carregando...</p></div>`;
+  try{ sub = await loadSubFromSupabase(id); }
+  catch(e){ console.error(e); sub = loadSubs().find(x=>String(x.id)===String(id))||null; }
+  render();
+}
+
+function render(){
+  if(!sub){document.getElementById("main-content").innerHTML=`<div class="card"><h1>Inscrição não encontrada</h1><div class="btn-group"><button class="btn btn-outline" onclick="location.href='/registro.html'">Voltar</button></div></div>`;return}
+  const rows=[
+    ["E-mail *",sub.email],["Selecione o servidor *",sub.servidor],["Nick *",sub.nick],
+    ["RG *",sub.rg],["Discord *",sub.discord],["Número *",sub.numero],
+    ["Idade *",sub.idade],["Level *",sub.level],["ORG / CORP *",sub.orgCorp],
+    ["Plataforma *",sub.plataforma],
+    ["Descreva como você realiza o seu Roleplay (RP) dentro da cidade *",sub.rp],
+    ["Tem experiência com mapeação? *",sub.expMap],
+    ["Tem experiência em administração? *",sub.expAdm],
+    ["Por que você deseja fazer parte do setor Mapper? *",sub.motivo],
+    ["Qual é o seu nível de conhecimento em mapeamento? *",sub.nivel],
+    ["Há quanto tempo você joga em nossa cidade? *",sub.tempoCidade],
+    ["Na sua opinião, quais características são essenciais para um bom Mapper? *",sub.caracteristicas],
+    ["Você se considera responsável para lidar com propriedades de alto valor? Justifique. *",sub.responsabilidade],
+    ["Como você agiria caso cometesse um erro no mapeamento de uma casa? *",sub.erro],
+    ["IP",sub.ip],["Navegador",sub.navegador],
+    ["Data/Hora",sub.data_hora?new Date(sub.data_hora).toLocaleString("pt-BR"):fmtDate(sub.createdAt)],
+  ];
+
+  const canDelete = isSuperAdmin();
+  const canEdit = isSuperAdmin() || CURRENT_ROLE==="responsavel";
+
+  document.getElementById("main-content").innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+        <div>
+          <h1>Inscrição — ${escapeHtml(sub.nick)}</h1>
+          <p class="subtitle">Enviado em ${fmtDate(sub.createdAt)}</p>
+        </div>
+        <span class="badge ${sub.status}">${labelStatus(sub.status)}</span>
+      </div>
+      <div style="margin-top:1rem">
+        ${rows.map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="location.href='/registro.html'">${icon("arrow-left")} Voltar</button>
+        ${sub.status==="pending"?`
+          <button class="btn btn-success" id="btnApprove">${icon("check")} Aprovar</button>
+          <button class="btn btn-danger"  id="btnReject">${icon("x")} Recusar</button>`:""}
+        ${canDelete?`<button class="btn btn-danger" id="btnDelete" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c)">${icon("trash")} Excluir formulário</button>`:""}
+        <button class="btn btn-outline" id="btnManage">${icon("settings")} Gerenciamento</button>
+      </div>
+      <div id="managePanel" style="display:${managePanelOpen?'block':'none'}">
+        <div class="manage-panel">
+          <h3>${icon("settings",16)} Painel de gerenciamento</h3>
+          <p class="subtitle" style="margin:.2rem 0 .5rem">Escolha uma ação abaixo:</p>
+          <div class="btn-group">
+            <button class="btn btn-primary" id="btnCopy">${icon("copy",16)} Copiar formulário</button>
+            ${canEdit?`<button class="btn btn-outline" id="btnEdit">${icon("edit",16)} Editar formulário</button>`:""}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const a=document.getElementById("btnApprove"),r=document.getElementById("btnReject");
+  if(a)a.onclick=()=>decide("approved");
+  if(r)r.onclick=()=>decide("rejected");
+
+  const del=document.getElementById("btnDelete");
+  if(del) del.onclick=deleteSub;
+
+  document.getElementById("btnManage").onclick=()=>{
+    managePanelOpen = !managePanelOpen;
+    document.getElementById("managePanel").style.display = managePanelOpen?'block':'none';
+  };
+  const copyBtn=document.getElementById("btnCopy");
+  if(copyBtn) copyBtn.onclick=copyForm;
+  const editBtn=document.getElementById("btnEdit");
+  if(editBtn) editBtn.onclick=()=>location.href=`/formulario.html?edit=${sub.id}`;
+}
+
+async function decide(status){
+  try{ await updateStatusSupabase(sub.id,status); }catch(e){ console.warn(e); }
+  sub.status=status;
+  toast(status==="approved"?"Inscrição aprovada":"Inscrição recusada",status==="approved"?"success":"error");
+  try{ await sendDiscord(sub,status, CURRENT_USER?.email); }catch{}
+  try{ await createNotification({tipo:status,titulo:status==="approved"?"Inscrição aprovada":"Inscrição recusada",mensagem:`${sub.nick||"—"} (${sub.servidor||"—"})`,formulario_id:sub.id,ator:CURRENT_USER?.email}); }catch{}
+  render();
+}
+
+async function deleteSub(){
+  if(!confirm(`Excluir permanentemente o formulário de ${sub.nick||sub.email}? Esta ação não pode ser desfeita.`)) return;
+  try{
+    await deleteFormularioSupabase(sub.id);
+    await createNotification({tipo:"deleted",titulo:"Formulário excluído",mensagem:`${sub.nick||"—"} (${sub.servidor||"—"}) foi excluído`,formulario_id:sub.id,ator:CURRENT_USER?.email});
+    toast("Formulário excluído","success");
+    setTimeout(()=>location.href="/registro.html", 500);
+  }catch(e){
+    console.error(e);
+    toast(e.message||"Erro ao excluir","error");
+  }
+}
+
+async function copyForm(){
+  const rows=[
+    ["E-mail",sub.email],["Servidor",sub.servidor],["Nick",sub.nick],["RG",sub.rg],
+    ["Discord",sub.discord],["Número",sub.numero],["Idade",sub.idade],["Level",sub.level],
+    ["ORG / CORP",sub.orgCorp],["Plataforma",sub.plataforma],
+    ["Roleplay (RP)",sub.rp],
+    ["Experiência com mapeação?",sub.expMap],
+    ["Experiência em administração?",sub.expAdm],
+    ["Motivo para ser Mapper",sub.motivo],
+    ["Nível de mapeamento",sub.nivel],
+    ["Tempo na cidade",sub.tempoCidade],
+    ["Características essenciais",sub.caracteristicas],
+    ["Responsabilidade com propriedades",sub.responsabilidade],
+    ["Como agiria em caso de erro",sub.erro],
+    ["IP",sub.ip],["Navegador",sub.navegador],
+    ["Data/Hora",sub.data_hora?new Date(sub.data_hora).toLocaleString("pt-BR"):fmtDate(sub.createdAt)],
+    ["Status",labelStatus(sub.status)],
+  ];
+  const text = `📋 FORMULÁRIO — ${sub.nick||"—"}\n` + "═".repeat(40) + "\n" +
+    rows.map(([k,v])=>`${k}: ${v||"—"}`).join("\n");
+  try{
+    await navigator.clipboard.writeText(text);
+    toast("Formulário copiado para a área de transferência","success");
+  }catch(e){
+    // fallback
+    const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove();
+    toast("Formulário copiado","success");
+  }
+}
+
+bootstrap();
+</script>
+</body>
+</html>

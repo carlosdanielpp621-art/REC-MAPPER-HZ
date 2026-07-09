@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Registro de Formulários — REC Mapper</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  /* Cada linha: numeração + info à esquerda, status à direita */
+  .entry{
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:1rem;
+    width:100%;
+  }
+  .entry-top{
+    display:flex;
+    flex:1 1 auto;
+    min-width:0;
+    justify-content:space-between;
+    align-items:center;
+    gap:1rem;
+    width:100%;
+  }
+  .entry-main{
+    display:flex;
+    align-items:flex-start;
+    gap:.75rem;
+    flex:1 1 auto;
+    min-width:0;
+    text-align:left;
+  }
+  .entry-num{
+    font-weight:700;
+    color:var(--muted);
+    min-width:1.75rem;
+    text-align:right;
+    padding-top:.1rem;
+  }
+  .entry .meta{
+    display:flex;
+    flex-direction:column;
+    gap:.15rem;
+    align-items:flex-start;
+    text-align:left;
+    min-width:0;
+    flex:1 1 auto;
+  }
+  .entry .meta .sub{word-break:break-word}
+  .entry-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1000}
+  .modal-card{background:var(--panel,#141821);color:#fff;border-radius:14px;padding:1.5rem;max-width:460px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .modal-card h2{margin:0 0 .5rem;font-size:1.15rem}
+  .modal-card input, .modal-card select{width:100%;padding:.7rem .9rem;border-radius:8px;border:1px solid #2a2f3a;background:#0d1017;color:#fff;margin-top:.4rem}
+  .row-two{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+  .stack{display:flex;flex-direction:column;gap:.6rem}
+</style>
+</head>
+<body>
+<div id="panel-root"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+const SERVIDORES = ["Servidor 1","Servidor 2","Servidor 3","Servidor 4","Servidor 5"];
+let filterServer="";
+let searchEmail="";
+let allSubs=[];
+let loading=true;
+let loadError="";
+
+async function bootstrap(){
+  await refreshAuth();
+  if(!CURRENT_USER){ location.href="/login.html"; return; }
+  if(!isMapper()){
+    renderPanel({active:"registro"});
+    document.getElementById("main-content").innerHTML = `
+      <div class="card">
+        <h1>Acesso negado</h1>
+        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_USER.email)}</strong> não possui cargo autorizado.</p>
+        <div class="btn-group">
+          <button class="btn btn-outline" onclick="signOut()">Sair</button>
+          <button class="btn btn-primary" onclick="location.href='/index.html'">Voltar ao início</button>
+        </div>
+      </div>`;
+    return;
+  }
+  // If user has a specific servidor assigned, force that filter
+  if(CURRENT_SERVIDOR) filterServer = CURRENT_SERVIDOR;
+  renderPanel({active:"registro"});
+  await fetchAll();
+}
+
+async function fetchAll(){
+  loading=true; render();
+  try{ allSubs = await loadSubsFromSupabase(); loadError=""; }
+  catch(e){ console.error(e); loadError = e.message || "Falha ao carregar"; allSubs = loadSubs(); }
+  loading=false; render();
+}
+
+function render(){
+  const restrictedServer = CURRENT_SERVIDOR; // forces filter
+  const list=allSubs.filter(s=>{
+    if(restrictedServer && s.servidor !== restrictedServer) return false;
+    if(filterServer && s.servidor!==filterServer) return false;
+    if(searchEmail && !(s.email||"").toLowerCase().includes(searchEmail.toLowerCase())) return false;
+    return true;
+  });
+  const items = loading
+    ? `<p class="subtitle">Carregando...</p>`
+    : (list.length?list.map((s,i)=>`
+    <div class="entry" data-id="${s.id}">
+      <div class="entry-top">
+        <div class="entry-main" style="cursor:pointer" onclick="location.href='/detalhe.html?id=${s.id}'">
+          <span class="entry-num">${i+1}.</span>
+          <div class="meta">
+            <span class="name">${escapeHtml(s.nick||"—")} <span style="color:var(--muted);font-weight:400">· ${escapeHtml(s.servidor||"")}</span></span>
+            <span class="sub">${escapeHtml(s.email||"")}</span>
+            <span class="sub">${fmtDate(s.createdAt)}</span>
+          </div>
+        </div>
+        <div class="entry-actions">
+          <span class="badge ${s.status}">${labelStatus(s.status)}</span>
+        </div>
+      </div>
+    </div>`).join(""):`<p class="subtitle">Nenhum formulário encontrado com esses filtros.</p>`);
+
+  const serverBadge = restrictedServer
+    ? `<p class="subtitle" style="margin-top:.2rem">Servidor: <strong>${escapeHtml(restrictedServer)}</strong></p>`
+    : (isSuperAdmin() ? `<p class="subtitle" style="margin-top:.2rem">Servidor: <strong>Todos os servidores</strong></p>` : "");
+
+  document.getElementById("main-content").innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+        <div>
+          <h1>Registro de Inscrições</h1>
+          <p class="subtitle">${list.length} de ${allSubs.length} formulário(s)${loadError?` · <span style="color:var(--danger)">${escapeHtml(loadError)}</span>`:""}</p>
+          <p class="subtitle" style="margin-top:.2rem">Logado como <strong>${escapeHtml(CURRENT_USER.email)}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
+          ${serverBadge}
+        </div>
+        <div class="btn-group" style="margin:0;flex-wrap:wrap">
+          ${canManageMembers()?`<button class="btn btn-outline" id="btnLock" style="padding:.5rem .8rem;font-size:.85rem"><span id="btnLockIcon">${icon("lock",16)}</span> <span id="btnLockLabel">Trancar formulário</span></button>`:""}
+
+          ${canManageMembers()?`<button class="btn btn-outline" id="btnLiberar" style="padding:.5rem .8rem;font-size:.85rem">${icon("unlock",16)} Liberar reenvio</button>`:""}
+          <button class="btn btn-primary" id="btnAnalista">${icon("plus")} Adicionar Analista</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 240px;gap:.75rem;margin-top:1rem" class="filters">
+        <div class="field" style="margin:0;padding:.85rem 1rem">
+          <label style="margin-bottom:.4rem;font-size:.9rem">🔎 Pesquisar por e-mail</label>
+          <input id="searchEmail" placeholder="digite o e-mail..." value="${escapeHtml(searchEmail)}" />
+        </div>
+        <div class="field" style="margin:0;padding:.85rem 1rem">
+          <label style="margin-bottom:.4rem;font-size:.9rem">Filtrar por servidor</label>
+          <select id="filterServer" ${restrictedServer?"disabled":""}>
+            <option value="">${restrictedServer?restrictedServer:"Todos os servidores"}</option>
+            ${SERVIDORES.map(sv=>`<option ${filterServer===sv?"selected":""}>${sv}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div class="entry-list" style="margin-top:1.25rem">${items}</div>
+    </div>`;
+
+  const se=document.getElementById("searchEmail");
+  if(se){ se.addEventListener("input",e=>{searchEmail=e.target.value;render();const el=document.getElementById("searchEmail");el.focus();el.setSelectionRange(searchEmail.length,searchEmail.length)}); }
+  const fs=document.getElementById("filterServer");
+  if(fs && !restrictedServer) fs.addEventListener("change",e=>{filterServer=e.target.value;render()});
+
+  document.getElementById("btnAnalista").onclick = openAnalistaPanel;
+  const bl = document.getElementById("btnLiberar");
+  if(bl) bl.onclick = openLiberarModal;
+  const lockBtn = document.getElementById("btnLock");
+  if(lockBtn){
+    (async ()=>{
+      const locked = await isFormLocked();
+      updateLockButton(locked);
+    })();
+    lockBtn.onclick = async ()=>{
+      const currently = await isFormLocked();
+      const next = !currently;
+      const label = next ? "TRANCAR" : "DESTRANCAR";
+      if(!confirm(`${label} o formulário? ${next?"Usuários NÃO poderão enviar novos formulários.":"Usuários poderão enviar formulários normalmente."}`)) return;
+      try{
+        await setFormLocked(next);
+        updateLockButton(next);
+        toast(next?"Formulário trancado":"Formulário destrancado", next?"error":"success");
+      }catch(e){
+        toast(e.message||"Erro ao alterar status","error");
+      }
+    };
+  }
+}
+
+function updateLockButton(locked){
+  const btn = document.getElementById("btnLock");
+  const label = document.getElementById("btnLockLabel");
+  const ic = document.getElementById("btnLockIcon");
+  if(!btn || !label) return;
+  if(locked){
+    label.textContent = "Destrancar formulário";
+    if(ic) ic.innerHTML = icon("unlock",16);
+    btn.style.borderColor = "var(--success)";
+    btn.style.color = "var(--success)";
+  }else{
+    label.textContent = "Trancar formulário";
+    if(ic) ic.innerHTML = icon("lock",16);
+    btn.style.borderColor = "";
+    btn.style.color = "";
+  }
+}
+
+
+function openLiberarModal(){
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.innerHTML = `
+    <div class="modal-card">
+      <h2>Liberar reenvio do formulário</h2>
+      <p class="subtitle" style="margin:.2rem 0 .8rem">Permite ao usuário reenviar o formulário antes do prazo de 48h. Informe os dados exatos do envio anterior.</p>
+      <label class="subtitle" style="margin-top:.4rem;display:block">E-mail</label>
+      <input id="libEmail" type="email" placeholder="exemplo@gmail.com" />
+      <label class="subtitle" style="margin-top:.6rem;display:block">Nick</label>
+      <input id="libNick" placeholder="Nick do jogador" />
+      <div class="row-two" style="margin-top:.6rem">
+        <div>
+          <label class="subtitle" style="display:block">Servidor</label>
+          <select id="libServidor">
+            <option value="" disabled selected>Selecione</option>
+            ${SERVIDORES.map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label class="subtitle" style="display:block">RG</label>
+          <input id="libRg" placeholder="RG" />
+        </div>
+      </div>
+      <div class="stack" style="margin-top:1rem">
+        <button class="btn btn-primary" id="libConfirm">${icon("unlock",16)} Liberar reenvio</button>
+        <button class="btn btn-outline" id="libCancel">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = ()=>wrap.remove();
+  wrap.querySelector("#libCancel").onclick = close;
+  wrap.addEventListener("click", e=>{ if(e.target===wrap) close(); });
+  wrap.querySelector("#libConfirm").onclick = async ()=>{
+    const email = wrap.querySelector("#libEmail").value.trim();
+    const nick = wrap.querySelector("#libNick").value.trim();
+    const servidor = wrap.querySelector("#libServidor").value;
+    const rg = wrap.querySelector("#libRg").value.trim();
+    if(!email || !nick || !servidor || !rg){ toast("Preencha todos os campos","error"); return; }
+    try{
+      await createLiberacao({email,nick,servidor,rg});
+      toast(`Reenvio liberado para ${email}`,"success");
+      close();
+    }catch(e){
+      toast(e.message || "Erro ao liberar","error");
+    }
+  };
+  setTimeout(()=>wrap.querySelector("#libEmail").focus(), 50);
+}
+
+async function openAnalistaPanel(){
+  const canManage = canManageMembers();
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.innerHTML = `
+    <div class="modal-card" style="max-width:580px">
+      <h2>Painel Administrativo — Analistas</h2>
+      <p class="subtitle" style="margin:.2rem 0 .8rem">${canManage?"Gerencie os membros com cargo cadastrado.":"Você tem permissão apenas para visualizar."}</p>
+      <div id="membersList" style="max-height:340px;overflow:auto;border:1px solid #2a2f3a;border-radius:10px;padding:.5rem;background:#0d1017">
+        <p class="subtitle" style="margin:.5rem">Carregando...</p>
+      </div>
+      ${canManage?`
+      <div class="stack" style="margin-top:1rem">
+        <div class="row-two">
+          <button class="btn btn-primary" id="addRespBtn">${icon("plus")} Adicionar Responsável Mapper(a)</button>
+          <button class="btn btn-primary" id="addAuxBtn">${icon("plus")} Adicionar Auxiliar Mapper(a)</button>
+        </div>
+        ${isRootSuperAdmin()?`<button class="btn btn-primary" id="addSuperBtn" style="background:#facc15;color:#111">${icon("plus")} Adicionar Super Admin</button>`:""}
+        <button class="btn btn-outline" id="closePanelBtn">Cancelar</button>
+      </div>`:`
+      <div class="stack" style="margin-top:1rem">
+        <button class="btn btn-outline" id="closePanelBtn">Fechar</button>
+      </div>`}
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = ()=>wrap.remove();
+  wrap.querySelector("#closePanelBtn").onclick = close;
+  wrap.addEventListener("click", e=>{ if(e.target===wrap) close(); });
+  if(canManage){
+    wrap.querySelector("#addRespBtn").onclick = ()=>openAddModal("responsavel", ()=>loadMembers(wrap));
+    wrap.querySelector("#addAuxBtn").onclick  = ()=>openAddModal("auxiliar",   ()=>loadMembers(wrap));
+    const sb2 = wrap.querySelector("#addSuperBtn");
+    if(sb2) sb2.onclick = ()=>openAddModal("super_admin", ()=>loadMembers(wrap));
+  }
+  await loadMembers(wrap);
+}
+
+async function loadMembers(wrap){
+  const box = wrap.querySelector("#membersList");
+  const canManage = canManageMembers();
+  box.innerHTML = `<p class="subtitle" style="margin:.5rem">Carregando...</p>`;
+  try{
+    const { data, error } = await sb.from("mapper_roles")
+      .select("email,role,servidor,created_at")
+      .order("role",{ascending:true}).order("created_at",{ascending:true});
+    if(error) throw error;
+    if(!data || !data.length){
+      box.innerHTML = `<p class="subtitle" style="margin:.5rem">Nenhum membro cadastrado.</p>`;
+      return;
+    }
+    box.innerHTML = data.map((m,i)=>{
+      const isRoot = (m.email||"").toLowerCase() === "criarp21@gmail.com";
+      const isSuperRow = isRoot || m.role === "super_admin";
+      // Só o root (criarp21) é intocável; super admins adicionados só podem ser removidos pelo root
+      const canRemove = canManage && !isRoot && !(m.role === "super_admin" && !isRootSuperAdmin());
+      const servidorTxt = m.servidor ? m.servidor : "Todos os servidores";
+      return `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.55rem .65rem;border-bottom:1px solid #1e222c">
+        <div style="min-width:0">
+          <div style="font-weight:600">${i+1}. ${escapeHtml(roleLabel(m.role))}${isSuperRow?' <span style="color:#facc15;font-size:.75rem">★ Super Admin</span>':''}</div>
+          <div class="subtitle" style="margin:0;font-size:.85rem;word-break:break-all">${escapeHtml(m.email)} · <span style="color:#93c5fd">${escapeHtml(servidorTxt)}</span></div>
+        </div>
+        ${canRemove
+          ? `<button class="btn btn-outline" data-email="${escapeHtml(m.email)}" style="padding:.35rem .7rem">Remover</button>`
+          : (isRoot ? `<span class="subtitle" style="font-size:.75rem">Protegido</span>` : "")}
+      </div>`;
+    }).join("");
+    box.querySelectorAll("button[data-email]").forEach(b=>{
+      b.onclick = async ()=>{
+        const email = b.getAttribute("data-email");
+        if(!confirm(`Remover ${email}?`)) return;
+        const { error } = await sb.from("mapper_roles").delete().eq("email", email);
+        if(error){ toast(error.message || "Erro ao remover","error"); return; }
+        toast(`${email} removido`,"success");
+        await loadMembers(wrap);
+      };
+    });
+  }catch(e){
+    box.innerHTML = `<p class="subtitle" style="margin:.5rem;color:var(--danger)">${escapeHtml(e.message||"Erro ao carregar")}</p>`;
+  }
+}
+
+function openAddModal(role, onDone){
+  const label = roleLabel(role);
+  const showAll = isSuperAdmin();
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.style.zIndex = 1100;
+  const isSuperRole = role === "super_admin";
+  wrap.innerHTML = `
+    <div class="modal-card">
+      <h2>Adicionar ${label}</h2>
+      <p class="subtitle" style="margin:0 0 .5rem">Digite o e-mail do Google${isSuperRole?" (Super Admin verá todos os servidores).":" e selecione o servidor."}</p>
+      <label class="subtitle" style="margin-top:.6rem;display:block">E-mail</label>
+      <input id="newEmail" type="email" placeholder="exemplo@gmail.com" />
+      ${isSuperRole?`<input type="hidden" id="newServidor" value="__all__" />`:`
+      <label class="subtitle" style="margin-top:.8rem;display:block">Selecione o servidor</label>
+      <select id="newServidor">
+        <option value="" disabled selected>Selecione o servidor</option>
+        ${SERVIDORES.map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
+        ${showAll?`<option value="__all__">Todos os servidores</option>`:""}
+      </select>`}
+      <div class="stack" style="margin-top:1rem">
+        <button class="btn btn-primary" id="confirmBtn">Confirmar</button>
+        <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = ()=>wrap.remove();
+  wrap.querySelector("#cancelBtn").onclick = close;
+  wrap.addEventListener("click", e=>{ if(e.target===wrap) close(); });
+  wrap.querySelector("#confirmBtn").onclick = async ()=>{
+    const email = wrap.querySelector("#newEmail").value;
+    const sv = wrap.querySelector("#newServidor").value;
+    if(!sv){ toast("Selecione o servidor","error"); return; }
+    const servidor = sv === "__all__" ? null : sv;
+    try{
+      const saved = await addMapperRole(email, role, servidor);
+      toast(`${saved} cadastrado como ${label} (${servidor||"Todos os servidores"})`, "success");
+      close();
+      if(typeof onDone === "function") await onDone();
+    }catch(e){
+      toast(e.message || "Erro ao salvar", "error");
+    }
+  };
+  setTimeout(()=>wrap.querySelector("#newEmail").focus(), 50);
+}
+
+function labelStatus(s){return {pending:"Pendente",approved:"Aprovado",rejected:"Recusado"}[s]||s}
+
+bootstrap();
+</script>
+</body>
+</html>
