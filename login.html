@@ -28,7 +28,7 @@
   </div>
 </div>
 <script>
-function goBackOrIndex(){
+function goBackOrHome(){
   const referrer = document.referrer && document.referrer.startsWith(location.origin)
     ? document.referrer
     : "";
@@ -44,7 +44,7 @@ function goBackOrIndex(){
 }
 
 document.getElementById("btnGoogle").onclick = signInGoogle;
-document.getElementById("btnBack").onclick = goBackOrIndex;
+document.getElementById("btnBack").onclick = goBackOrHome;
 (async ()=>{
   await refreshAuth();
   if(CURRENT_USER){
