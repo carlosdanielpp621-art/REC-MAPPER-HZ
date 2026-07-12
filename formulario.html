@@ -23,10 +23,13 @@ let existingSub = null;
     const locked = await isFormLocked();
     if(locked){
       document.getElementById("main-content").innerHTML = `
-        <div class="card">
+        <div class="card" style="text-align:center">
           <h1>🔒 Formulário trancado</h1>
-          <p class="subtitle">As inscrições estão temporariamente encerradas. Aguarde a reabertura.</p>
-          <div class="btn-group">
+          <p class="subtitle" style="font-size:1rem;line-height:1.5">
+            O formulário está trancado e não poderá ser enviado no momento.<br/>
+            Consulte a equipe diretamente no <strong>TICKET</strong>.
+          </p>
+          <div class="btn-group" style="justify-content:center">
             <button class="btn btn-outline" onclick="location.href='/index.html'">Voltar ao início</button>
           </div>
         </div>`;

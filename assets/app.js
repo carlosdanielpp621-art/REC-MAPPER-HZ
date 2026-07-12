@@ -504,9 +504,15 @@ async function isFormLocked(){
 }
 async function setFormLocked(locked){
   if(!sb) throw new Error("Supabase não disponível");
-  const payload = { id:1, locked, locked_by: CURRENT_USER?.email||null, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-  const { error } = await sb.from("formulario_config").upsert(payload,{onConflict:"id"});
+  const payload = { locked: !!locked, locked_by: CURRENT_USER?.email||null, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  // A linha id=1 já existe no banco; usar UPDATE evita exigir política de INSERT.
+  let { data, error } = await sb.from("formulario_config").update(payload).eq("id",1).select();
   if(error) throw error;
+  if(!data || data.length === 0){
+    // Fallback: se por algum motivo a linha não existir, cria via upsert.
+    const up = await sb.from("formulario_config").upsert({ id:1, ...payload }, { onConflict:"id" });
+    if(up.error) throw up.error;
+  }
   await createNotification({
     tipo: locked?"locked":"unlocked",
     titulo: locked?"Formulário trancado":"Formulário destrancado",

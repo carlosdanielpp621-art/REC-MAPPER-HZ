@@ -56,6 +56,44 @@
   .modal-card input, .modal-card select{width:100%;padding:.7rem .9rem;border-radius:8px;border:1px solid #2a2f3a;background:#0d1017;color:#fff;margin-top:.4rem}
   .row-two{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
   .stack{display:flex;flex-direction:column;gap:.6rem}
+
+  /* Mobile: manter os 3 botões do topo lado a lado e ampliar o campo de e-mail */
+  @media (max-width: 900px){
+    .registro-actions{
+      display:grid !important;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:.4rem;
+      width:100%;
+      margin-top:.75rem;
+      flex-direction:row !important;
+    }
+    .registro-actions .btn{
+      width:100% !important;
+      padding:.55rem .35rem !important;
+      font-size:.72rem !important;
+      line-height:1.1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:.25rem;
+      white-space:normal;
+      text-align:center;
+    }
+    .registro-actions .btn svg{ width:14px; height:14px; flex-shrink:0; }
+    .registro-header{ flex-direction:column; align-items:stretch !important; }
+    .filters{
+      grid-template-columns:1fr !important;
+      gap:.6rem !important;
+    }
+    .filters .field{ width:100%; }
+    .filters input, .filters select{
+      width:100%;
+      font-size:1rem;
+      padding:.7rem .8rem;
+    }
+    /* Linha do registro: garantir que numero+info fiquem à esquerda e status à direita */
+    .entry{ flex-direction:row !important; align-items:center !important; }
+  }
 </style>
 </head>
 <body>
@@ -132,14 +170,14 @@ function render(){
 
   document.getElementById("main-content").innerHTML=`
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+      <div class="registro-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
         <div>
           <h1>Registro de Inscrições</h1>
           <p class="subtitle">${list.length} de ${allSubs.length} formulário(s)${loadError?` · <span style="color:var(--danger)">${escapeHtml(loadError)}</span>`:""}</p>
           <p class="subtitle" style="margin-top:.2rem">Logado como <strong>${escapeHtml(CURRENT_USER.email)}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
           ${serverBadge}
         </div>
-        <div class="btn-group" style="margin:0;flex-wrap:wrap">
+        <div class="btn-group registro-actions" style="margin:0;flex-wrap:wrap">
           ${canManageMembers()?`<button class="btn btn-outline" id="btnLock" style="padding:.5rem .8rem;font-size:.85rem"><span id="btnLockIcon">${icon("lock",16)}</span> <span id="btnLockLabel">Trancar formulário</span></button>`:""}
 
           ${canManageMembers()?`<button class="btn btn-outline" id="btnLiberar" style="padding:.5rem .8rem;font-size:.85rem">${icon("unlock",16)} Liberar reenvio</button>`:""}
