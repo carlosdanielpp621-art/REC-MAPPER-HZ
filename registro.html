@@ -128,6 +128,23 @@ async function bootstrap(){
   if(CURRENT_SERVIDOR) filterServer = CURRENT_SERVIDOR;
   renderPanel({active:"registro"});
   await fetchAll();
+  subscribeRealtime();
+}
+
+let _rtChan = null;
+function subscribeRealtime(){
+  if(!sb || _rtChan) return;
+  _rtChan = sb.channel("registro-live")
+    .on("postgres_changes",{event:"*",schema:"public",table:"formularios"}, ()=>{ fetchAll(); })
+    .on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"}, async ()=>{
+      const locked = await isFormLocked();
+      updateLockButton(locked);
+    })
+    .on("postgres_changes",{event:"*",schema:"public",table:"formulario_liberacoes"}, ()=>{ /* nada visível aqui */ })
+    .on("postgres_changes",{event:"*",schema:"public",table:"notifications"}, ()=>{
+      if(typeof loadNotifications === "function") loadNotifications();
+    })
+    .subscribe();
 }
 
 async function fetchAll(){
