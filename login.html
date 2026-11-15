@@ -5,27 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Login — REC Mapper</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-<meta property="og:title" content="Login — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Login."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Login."/></head>
+<meta name="description" content="Login — REC Mapper — Horizonte Roleplay."/><meta property="og:title" content="Login — REC Mapper"/><meta property="og:description" content="Setor Mappes do Horizonte Roleplay."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/></head>
 <body>
-<script src="/assets/startup.js?v=4"></script>
-<script src="/assets/supabase.min.js?v=4"></script>
-<script src="/assets/app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
 <div class="center-page">
   <div class="card login-card">
-    <div style="display:flex;justify-content:center;margin-bottom:.75rem">
-      <img class="brand-logo" src="/assets/logo.svg.png" alt="REC Mapper" />
+    <div>
+      <img class="brand-logo" src="/__l5e/assets-v1/331cc622-0b60-4087-a32d-2689c5ef7751/rec-mapper-logo.png" alt="REC Mapper" />
     </div>
     <h1>Acesso Administrativo</h1>
-    <p class="subtitle" style="text-align:center">
+    <p class="subtitle">
       Faça login com sua conta Google. Somente contas autorizadas como
-      <strong>Mappes</strong>
+      <strong>Mappes</strong> com cargo cadastrado
       poderão acessar o painel de Registro.
     </p>
-    <div class="btn-group" style="justify-content:center;margin-top:1.25rem">
+    <div class="btn-group">
       <button class="btn btn-primary" id="btnGoogle">Entrar com Google</button>
       <button class="btn btn-outline" id="btnBack">Voltar</button>
     </div>
-    <p id="statusMsg" class="subtitle" style="text-align:center;margin-top:1rem"></p>
+    <p id="statusMsg" class="subtitle"></p>
   </div>
 </div>
 <script>
@@ -44,19 +43,19 @@ function goBackOrHome(){
   }
 }
 
-document.getElementById("btnGoogle").onclick = async ()=>{try{await signInGoogle();}catch(error){document.getElementById("statusMsg").textContent=error.message||"Não foi possível entrar. Tente novamente.";}};
+document.getElementById("btnGoogle").onclick = signInGoogle;
 document.getElementById("btnBack").onclick = goBackOrHome;
-startPage(async ()=>{
+(async ()=>{
   await refreshAuth();
   if(CURRENT_USER){
     document.getElementById("statusMsg").innerHTML =
-      `Você já está logado como <strong>${escapeHtml(CURRENT_NICK||CURRENT_USER.name)}</strong>` +
+      `Você já está logado como <strong>${escapeHtml(CURRENT_USER.nick||"Membro")}</strong>` +
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
     // Após login, redireciona para a página de Registro (mappers)
     setTimeout(()=>location.href="/registro.html", 1201);
   }
-});
+})();
 </script>
 </body>
 </html>

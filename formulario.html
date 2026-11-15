@@ -5,17 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>REC EQUIPE MAPPERS — Formulário Setor Mappers</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-<meta property="og:title" content="REC EQUIPE MAPPERS — Formulário Setor Mappers"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. REC EQUIPE MAPPERS."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. REC EQUIPE MAPPERS."/></head>
+<meta name="description" content="REC EQUIPE MAPPERS — Formulário Setor Mappers — Horizonte Roleplay."/><meta property="og:title" content="REC EQUIPE MAPPERS — Formulário Setor Mappers"/><meta property="og:description" content="Setor Mappes do Horizonte Roleplay."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/></head>
 <body>
 <div id="panel-root"></div>
-<script src="/assets/startup.js?v=4"></script>
-<script src="/assets/supabase.min.js?v=4"></script>
-<script src="/assets/app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
 <script>
 const EDIT_ID = new URLSearchParams(location.search).get("edit");
 let existingSub = null;
 
-startPage(async ()=>{
+(async ()=>{
   await refreshAuth();
   renderPanel({active:"inicio"});
 
@@ -23,19 +22,15 @@ startPage(async ()=>{
     if(!CURRENT_USER || !canManageMembers()){
       location.href="/login.html"; return;
     }
-    try{ existingSub = await loadSubFromSupabase(EDIT_ID);if(!existingSub)throw new Error("Inscrição não encontrada"); }catch(e){ toast(e.message,"error");return; }
+    try{ existingSub = await loadSubFromSupabase(EDIT_ID); if(!existingSub)throw new Error("Formulário não encontrado"); }catch(e){document.getElementById("main-content").textContent=e.message;return;}
   }
 
   renderForm();
   subscribeLockRealtime();
-});
+})();
 
-function subscribeLockRealtime(){
- if(!sb||EDIT_ID)return;
- const c=sb.channel(`form-lock-${Math.random().toString(36).slice(2)}`).on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"},()=>updateSelectedLock()).subscribe();
- window.addEventListener("pagehide",()=>sb.removeChannel(c),{once:true});
-}
-async function updateSelectedLock(){const f=document.getElementById("formMapper");if(!f||EDIT_ID)return;const sv=f.elements.servidor.value;const btn=f.querySelector('[type="submit"]');try{const locked=sv?await isFormLocked(sv):false;btn.disabled=locked;const notice=document.getElementById("serverLockNotice");notice.textContent=locked?`O formulário do ${sv} está trancado. Consulte a equipe no ticket.`:"";notice.hidden=!locked;}catch(e){btn.disabled=true;toast("Não foi possível conferir o trancamento. Tente novamente.","error");}}
+function subscribeLockRealtime(){if(!sb||EDIT_ID)return;const channel=sb.channel('form-lock-'+Math.random().toString(36).slice(2)).on('postgres_changes',{event:'*',schema:'public',table:'formulario_config'},checkSelectedLock).subscribe();window.addEventListener('pagehide',()=>sb.removeChannel(channel),{once:true});}
+async function checkSelectedLock(){const form=document.getElementById('formMapper');if(!form||EDIT_ID)return;const server=form.elements.servidor.value;const button=form.querySelector('[type=submit]');try{const locked=server?await isFormLocked(server):false;button.disabled=locked;document.getElementById('lockNotice').textContent=locked?'Inscrições trancadas para '+server+'. Consulte a equipe no ticket.':'';}catch(e){button.disabled=true;document.getElementById('lockNotice').textContent='Não foi possível verificar as inscrições. Tente novamente.';}}
 
 function val(name){ return existingSub && existingSub[name] != null ? String(existingSub[name]) : ""; }
 function isChecked(name,value){
@@ -52,14 +47,14 @@ function renderForm(){
       <p class="subtitle">${sub}</p>
       <span class="server-badge">● ${EDIT_ID?"Modo edição":"Inscrição oficial"}</span>
 
-      <form id="formMapper" style="margin-top:1.5rem" novalidate>
+      <p id="lockNotice" class="lock-notice" role="status"></p><form id="formMapper" novalidate>
         <div class="form-grid">
-          <div class="field full"><label>E-mail *</label><input required type="email" name="email" value="${escapeHtml(val('email'))}" /></div>
+          ${!EDIT_ID||isSuperAdmin()?`<div class="field full"><label>E-mail *</label><input required type="email" name="email" value="${escapeHtml(val("email"))}" /></div>`:""}
 
           <div class="field"><label>Selecione o servidor *</label>
             <select required name="servidor">
               <option value="">Servidor</option>
-              ${["Servidor 1","Servidor 2","Servidor 3"].map(sv=>`<option ${val('servidor')===sv?'selected':''}>${sv}</option>`).join("")}
+              ${(EDIT_ID?allowedServers():["Servidor 1","Servidor 2","Servidor 3"]).map(sv=>`<option ${val('servidor')===sv?'selected':''}>${sv}</option>`).join("")}
             </select>
           </div>
           <div class="field"><label>Nick *</label><input required name="nick" value="${escapeHtml(val('nick'))}" /></div>
@@ -128,9 +123,7 @@ function renderForm(){
     </div>
   `;
 
-  document.getElementById("formMapper").insertAdjacentHTML("afterbegin",'<p id="serverLockNotice" class="lock-notice" role="status" hidden></p>');
-  document.querySelector('[name="servidor"]').addEventListener("change",updateSelectedLock);
-  if(EDIT_ID&&!isSuperAdmin()){const email=document.querySelector('[name="email"]');email.required=false;email.closest(".field").hidden=true;}
+  document.querySelector("[name=servidor]").addEventListener("change",checkSelectedLock);checkSelectedLock();
   document.getElementById("formMapper").addEventListener("submit", async e=>{
     e.preventDefault();
     const f=e.target;
@@ -155,9 +148,9 @@ function renderForm(){
     data.ip = await getUserIp();
     data.navegador = getUserAgent();
     data.status = "pending";
-    const sub={createdAt:Date.now(),...data};
+    const sub={id:uid(),createdAt:Date.now(),...data};
     try{
-      const saved = await saveToSupabase(data);sub.id=saved.id;sub.receipt=saved.receipt;
+      const saved = await saveToSupabase(data);
       await createNotification({tipo:"new",titulo:"Nova inscrição",mensagem:`${data.nick||"—"} (${data.servidor||"—"}) enviou um formulário`,formulario_id:saved?.id||null,ator:data.email});
     }catch(err){
       console.error(err);
@@ -166,9 +159,9 @@ function renderForm(){
       return;
     }
 
-    await sendDiscord(sub,"new");
+
     toast("Formulário enviado com sucesso!","success",2200);
-    setTimeout(()=>{ location.href="/sucesso.html"; }, 1400);
+    setTimeout(()=>{ location.href="sucesso.html"; }, 1400);
 
   });
 }

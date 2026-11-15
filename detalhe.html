@@ -5,17 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Inscrição — REC Mapper</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-<meta property="og:title" content="Inscrição — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Inscrição."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Inscrição."/></head>
+<meta name="description" content="Inscrição — REC Mapper — Horizonte Roleplay."/><meta property="og:title" content="Inscrição — REC Mapper"/><meta property="og:description" content="Setor Mappes do Horizonte Roleplay."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/></head>
 <body>
 <div id="panel-root"></div>
-<script src="/assets/startup.js?v=4"></script>
-<script src="/assets/supabase.min.js?v=4"></script>
-<script src="/assets/app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
 <script>
 const id=new URLSearchParams(location.search).get("id");
 let sub=null;
 let managePanelOpen=false;
-let history=[];
 
 function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}
 
@@ -33,15 +31,16 @@ async function bootstrap(){
 
 async function load(){
   document.getElementById("main-content").innerHTML=`<div class="card"><p class="subtitle">Carregando...</p></div>`;
-  try{ sub = await loadSubFromSupabase(id);history=await rpc("mapper_form_history",{_id:Number(id)}); }
-  catch(e){ console.error(e); sub=null;toast("Não foi possível carregar a inscrição","error"); }
+  try{ sub = await loadSubFromSupabase(id); }
+  catch(e){ console.error(e); sub = null; toast(e.message,"error"); }
   render();
+  if(sub) loadHistory();
 }
 
 function render(){
   if(!sub){document.getElementById("main-content").innerHTML=`<div class="card"><h1>Inscrição não encontrada</h1><div class="btn-group"><button class="btn btn-outline" onclick="location.href='/registro.html'">Voltar</button></div></div>`;return}
   const rows=[
-    ["E-mail *",sub.email],["Selecione o servidor *",sub.servidor],["Nick *",sub.nick],
+    ...(isSuperAdmin()?[["E-mail *",sub.email]]:[]),["Selecione o servidor *",sub.servidor],["Nick *",sub.nick],
     ["RG *",sub.rg],["Discord *",sub.discord],["Número *",sub.numero],
     ["Idade *",sub.idade],["Level *",sub.level],["ORG / CORP *",sub.orgCorp],
     ["Plataforma *",sub.plataforma],
@@ -63,46 +62,43 @@ function render(){
 
   document.getElementById("main-content").innerHTML=`
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+      <div>
         <div>
           <h1>Inscrição — ${escapeHtml(sub.nick)}</h1>
           <p class="subtitle">Enviado em ${fmtDate(sub.createdAt)}</p>
         </div>
         <span class="badge ${sub.status}">${labelStatus(sub.status)}</span>
       </div>
-      <div style="margin-top:1rem">
-        ${rows.filter(([k])=>isSuperAdmin()||!k.startsWith("E-mail")).map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
+      <div>
+        ${rows.map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
       </div>
-      <div class="btn-group">
+      <section class="history-section"><h2>Histórico de decisões</h2><div id="formHistory">Carregando...</div></section><div class="btn-group">
         <button class="btn btn-outline" onclick="location.href='/registro.html'">${icon("arrow-left")} Voltar</button>
         ${sub.status==="pending"?`
           <button class="btn btn-primary" id="btnAnalysis">${icon("search")} Análise</button>`:""}
         ${sub.status==="analysis"?`
           <button class="btn btn-success" id="btnApprove">${icon("check")} Aprovar</button>
           <button class="btn btn-danger"  id="btnReject">${icon("x")} Recusar</button>`:""}
-        ${canDelete?`<button class="btn btn-danger" id="btnDelete" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c)">${icon("trash")} Excluir formulário</button>`:""}
-        ${canReview()&&["approved","rejected"].includes(sub.status)?`<button class="btn btn-outline" id="btnReview">${icon("edit")} Revisão</button>`:""}
-        <button class="btn btn-outline" id="btnManage">${icon("settings")} Gerenciamento</button>
+        ${canDelete?`<button class="btn btn-danger" id="btnDelete">${icon("trash")} Excluir formulário</button>`:""}
+        ${canManageMembers()&&["approved","rejected"].includes(sub.status)?`<button class="btn btn-outline" id="btnRevision">${icon("edit")} Revisão</button>`:""}<button class="btn btn-outline" id="btnManage">${icon("settings")} Gerenciamento</button>
       </div>
-      <div id="managePanel" style="display:${managePanelOpen?'block':'none'}">
+      <div id="managePanel" ${managePanelOpen?"":"hidden"}>
         <div class="manage-panel">
           <h3>${icon("settings",16)} Painel de gerenciamento</h3>
-          <p class="subtitle" style="margin:.2rem 0 .5rem">Escolha uma ação abaixo:</p>
+          <p class="subtitle">Escolha uma ação abaixo:</p>
           <div class="btn-group">
             <button class="btn btn-primary" id="btnCopy">${icon("copy",16)} Copiar formulário</button>
             ${canEdit?`<button class="btn btn-outline" id="btnEdit">${icon("edit",16)} Editar formulário</button>`:""}
           </div>
         </div>
       </div>
-      <section class="history-section"><h2>Histórico de decisões</h2>${history.length?history.map(h=>`<article class="history-row"><strong>${h.acao==="revisao"?"Revisão":labelStatus(h.status_novo)} · ${labelStatus(h.status_anterior)} → ${labelStatus(h.status_novo)}</strong><p>${escapeHtml(h.motivo)}</p><span class="subtitle">${fmtDate(h.created_at)}${isSuperAdmin()&&h.ator?" · "+escapeHtml(h.ator):""}</span></article>`).join(""):"<p class='subtitle'>Nenhuma decisão registrada.</p>"}</section>
     </div>`;
 
-  const review=document.getElementById("btnReview");if(review)review.onclick=()=>openDecision(null,true);
   const a=document.getElementById("btnApprove"),r=document.getElementById("btnReject");
-  if(a)a.onclick=()=>openDecision("approved");
+  if(a)a.onclick=()=>decide("approved");
   const an=document.getElementById("btnAnalysis");
-  if(an)an.onclick=async()=>{an.disabled=true;try{await updateStatusSupabase(sub.id,"analysis");await load();toast("Inscrição em análise");}catch(e){toast(e.message,"error");an.disabled=false;}};
-  if(r)r.onclick=()=>openDecision("rejected");
+  if(an)an.onclick=async()=>{ an.disabled=true;try{await updateStatusSupabase(sub.id,"analysis");await load();}catch(e){toast(e.message,"error");an.disabled=false;} };
+  if(r)r.onclick=()=>decide("rejected"); const rev=document.getElementById("btnRevision");if(rev)rev.onclick=()=>decide(sub.status==="approved"?"rejected":"approved",true);
 
   const del=document.getElementById("btnDelete");
   if(del) del.onclick=deleteSub;
@@ -117,12 +113,7 @@ function render(){
   if(editBtn) editBtn.onclick=()=>location.href=`/formulario.html?edit=${sub.id}`;
 }
 
-function openDecision(status,revision=false){
- const w=document.createElement("div");w.className="modal-backdrop";
- const target=status|| (sub.status==="approved"?"rejected":"approved");
- w.innerHTML=`<section class="modal-card" role="dialog" aria-modal="true" aria-label="${revision?"Revisão":"Decisão"}"><h2>${revision?"Revisão da inscrição":target==="approved"?"Aprovar inscrição":"Recusar inscrição"}</h2><form id="decisionForm">${revision?`<label for="reviewType">Selecione a revisão</label><select id="reviewType"><option value="approved" ${target==="approved"?"selected":""} ${sub.status==="approved"?"disabled":""}>Solicitar aprovação</option><option value="rejected" ${target==="rejected"?"selected":""} ${sub.status==="rejected"?"disabled":""}>Solicitar reprovação</option></select>`:""}<label for="decisionReason">Motivo</label><textarea id="decisionReason" required rows="4"></textarea><div class="btn-group"><button class="btn btn-primary" type="submit">Confirmar</button><button class="btn btn-outline" id="decisionCancel" type="button">Cancelar</button></div></form></section>`;
- document.body.appendChild(w);w.querySelector("#decisionReason").focus();w.querySelector("#decisionCancel").onclick=()=>w.remove();w.addEventListener("keydown",e=>{if(e.key==="Escape")w.remove();});w.querySelector("#decisionForm").onsubmit=async e=>{e.preventDefault();const reason=w.querySelector("#decisionReason").value.trim();if(!reason){toast("Informe o motivo","error");return;}const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;const next=revision?w.querySelector("#reviewType").value:target;try{await updateStatusSupabase(sub.id,next,reason,revision);w.remove();await load();toast(revision?"Revisão concluída":"Decisão registrada");await sendDiscord(sub,next);}catch(err){toast(err.message,"error");btn.disabled=false;}};
-}
+function decide(status,revision=false){const wrap=document.createElement('div');wrap.className='modal-backdrop';const title=revision?'Revisão do formulário':status==='approved'?'Aprovar formulário':'Recusar formulário';wrap.innerHTML=`<section class="modal-card" role="dialog" aria-modal="true" aria-label="${title}"><h2>${title}</h2><form><label>${revision?'Selecione a revisão':'Decisão'}<select name="status"><option value="${status}">${revision?(status==='approved'?'Solicitar aprovação':'Solicitar reprovação'):(status==='approved'?'Aprovar':'Recusar')}</option></select></label><label>Motivo<textarea name="motivo" required rows="4" placeholder="Informe o motivo da decisão"></textarea></label><div class="btn-group"><button type="submit" class="btn btn-primary">Confirmar</button><button type="button" class="btn btn-outline" id="cancelDecision">Cancelar</button></div></form></section>`;document.body.appendChild(wrap);wrap.querySelector('#cancelDecision').onclick=()=>wrap.remove();wrap.onclick=e=>{if(e.target===wrap)wrap.remove();};wrap.querySelector('textarea').focus();wrap.querySelector('form').onsubmit=async e=>{e.preventDefault();const motivo=wrap.querySelector('textarea').value.trim();if(!motivo){toast('Informe o motivo','error');return;}const b=wrap.querySelector('[type=submit]');b.disabled=true;try{await updateStatusSupabase(sub.id,status,motivo,revision);wrap.remove();toast('Decisão registrada');await load();}catch(err){toast(err.message,'error');b.disabled=false;}};}
 
 async function deleteSub(){
   if(!confirm(`Excluir permanentemente o formulário de ${sub.nick||sub.email}? Esta ação não pode ser desfeita.`)) return;
@@ -139,7 +130,7 @@ async function deleteSub(){
 
 async function copyForm(){
   const rows=[
-    ["E-mail",sub.email],["Servidor",sub.servidor],["Nick",sub.nick],["RG",sub.rg],
+    ...(isSuperAdmin()?[["E-mail",sub.email]]:[]),["Servidor",sub.servidor],["Nick",sub.nick],["RG",sub.rg],
     ["Discord",sub.discord],["Número",sub.numero],["Idade",sub.idade],["Level",sub.level],
     ["ORG / CORP",sub.orgCorp],["Plataforma",sub.plataforma],
     ["Roleplay (RP)",sub.rp],
@@ -156,7 +147,7 @@ async function copyForm(){
     ["Status",labelStatus(sub.status)],
   ];
   const text = `📋 FORMULÁRIO — ${sub.nick||"—"}\n` + "═".repeat(40) + "\n" +
-    rows.filter(([k])=>isSuperAdmin()||k!=="E-mail").map(([k,v])=>`${k}: ${v||"—"}`).join("\n");
+    rows.map(([k,v])=>`${k}: ${v||"—"}`).join("\n");
   try{
     await navigator.clipboard.writeText(text);
     toast("Formulário copiado para a área de transferência","success");
@@ -168,7 +159,8 @@ async function copyForm(){
   }
 }
 
-startPage(bootstrap);
+async function loadHistory(){const el=document.getElementById('formHistory');try{const rows=await rpc('mapper_form_history',{_id:Number(sub.id)});el.innerHTML=rows.map(h=>`<article class="history-item"><strong>${h.acao==='revisao'?'Revisão':h.acao==='edicao'?'Edição':labelStatus(h.status_novo)}</strong><span class="sub">${fmtDate(h.created_at)}${isSuperAdmin()&&h.ator?' · '+escapeHtml(h.ator):''}</span><p>${escapeHtml(h.motivo)}</p></article>`).join('')||'<p class="subtitle">Sem decisões registradas.</p>';}catch(e){el.textContent=e.message;}}
+bootstrap();
 </script>
 </body>
 </html>

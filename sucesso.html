@@ -5,18 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Formulário enviado — REC Mapper</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-<meta property="og:title" content="Formulário enviado — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Formulário enviado."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Formulário enviado."/></head>
+<meta name="description" content="Formulário enviado — REC Mapper — Horizonte Roleplay."/><meta property="og:title" content="Formulário enviado — REC Mapper"/><meta property="og:description" content="Setor Mappes do Horizonte Roleplay."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/></head>
 <body>
 <div id="panel-root"></div>
-<script src="/assets/startup.js?v=4"></script>
-<script src="/assets/supabase.min.js?v=4"></script>
-<script src="/assets/app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
 <script>
-startPage(async ()=>{
+(async ()=>{
   await refreshAuth();
   renderPanel({active:"inicio"});
   document.getElementById("main-content").innerHTML = `
-    <div class="card prose" style="max-width:720px;margin:2rem auto">
+    <div class="card prose">
       <h1>✅ Formulário enviado com sucesso</h1>
       <p>Seu formulário foi enviado com sucesso, agora aguarde enquanto a equipe administrativa analisa as suas informações dentro do prazo de até <strong>10 dias</strong>.</p>
       <p>Caso não haja resposta nesse período, abra um ticket no Discord informando o e-mail utilizado no formulário.</p>
@@ -24,7 +23,7 @@ startPage(async ()=>{
         <button class="btn btn-primary" onclick="location.href='/index.html'">Voltar ao início</button>
       </div>
     </div>`;
-});
+})();
 </script>
 </body>
 </html>

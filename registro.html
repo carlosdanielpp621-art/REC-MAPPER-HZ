@@ -5,96 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Registro de Formulários — REC Mapper</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-<style>
-  /* Cada linha: numeração + info à esquerda, status à direita */
-  .entry{
-    display:flex !important;
-    flex-direction:row !important;
-    align-items:center !important;
-    justify-content:space-between !important;
-    gap:1rem;
-    width:100%;
-  }
-  .entry-top{
-    display:flex;
-    flex:1 1 auto;
-    min-width:0;
-    justify-content:space-between;
-    align-items:center;
-    gap:1rem;
-    width:100%;
-  }
-  .entry-main{
-    display:flex;
-    align-items:flex-start;
-    gap:.75rem;
-    flex:1 1 auto;
-    min-width:0;
-    text-align:left;
-  }
-  .entry-num{
-    font-weight:700;
-    color:var(--muted);
-    min-width:1.75rem;
-    text-align:right;
-    padding-top:.1rem;
-  }
-  .entry .meta{
-    display:flex;
-    flex-direction:column;
-    gap:.15rem;
-    align-items:flex-start;
-    text-align:left;
-    min-width:0;
-    flex:1 1 auto;
-  }
-  .entry .meta .sub{word-break:break-word}
-  .entry-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
 
-  /* Mobile: manter os 3 botões do topo lado a lado e ampliar o campo de e-mail */
-  @media (max-width: 900px){
-    .registro-actions{
-      display:grid !important;
-      grid-template-columns:repeat(3, minmax(0, 1fr));
-      gap:.4rem;
-      width:100%;
-      margin-top:.75rem;
-      flex-direction:row !important;
-    }
-    .registro-actions .btn{
-      width:100% !important;
-      padding:.55rem .35rem !important;
-      font-size:.72rem !important;
-      line-height:1.1;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:.25rem;
-      white-space:normal;
-      text-align:center;
-    }
-    .registro-actions .btn svg{ width:14px; height:14px; flex-shrink:0; }
-    .registro-header{ flex-direction:column; align-items:stretch !important; }
-    .filters{
-      grid-template-columns:1fr !important;
-      gap:.6rem !important;
-    }
-    .filters .field{ width:100%; }
-    .filters input, .filters select{
-      width:100%;
-      font-size:1rem;
-      padding:.7rem .8rem;
-    }
-    /* Linha do registro: garantir que numero+info fiquem à esquerda e status à direita */
-    .entry{ flex-direction:row !important; align-items:center !important; }
-  }
-</style>
-<meta property="og:title" content="Registro de Formulários — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Registro de Formulários."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Registro de Formulários."/></head>
+<meta name="description" content="Registro de Formulários — REC Mapper — Horizonte Roleplay."/><meta property="og:title" content="Registro de Formulários — REC Mapper"/><meta property="og:description" content="Setor Mappes do Horizonte Roleplay."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/></head>
 <body>
 <div id="panel-root"></div>
-<script src="/assets/startup.js?v=4"></script>
-<script src="/assets/supabase.min.js?v=4"></script>
-<script src="/assets/app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/app.js"></script>
 <script>
 const SERVIDORES = ["Servidor 1","Servidor 2","Servidor 3"];
 let filterServer="";
@@ -111,7 +27,7 @@ async function bootstrap(){
     document.getElementById("main-content").innerHTML = `
       <div class="card">
         <h1>Acesso negado</h1>
-        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_NICK||CURRENT_USER.name)}</strong> não possui cargo autorizado.</p>
+        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_USER.nick||"Membro")}</strong> não possui cargo autorizado.</p>
         <div class="btn-group">
           <button class="btn btn-outline" onclick="signOut()">Sair</button>
           <button class="btn btn-primary" onclick="location.href='/index.html'">Voltar ao início</button>
@@ -120,7 +36,7 @@ async function bootstrap(){
     return;
   }
   // If user has a specific servidor assigned, force that filter
-  if(CURRENT_SERVIDOR) filterServer = CURRENT_SERVIDOR;
+  if(!isSuperAdmin()&&CURRENT_SERVIDOR) filterServer = CURRENT_SERVIDOR;
   renderPanel({active:"registro"});
   await fetchAll();
   subscribeRealtime();
@@ -129,10 +45,10 @@ async function bootstrap(){
 let _rtChan = null;
 function subscribeRealtime(){
   if(!sb || _rtChan) return;
-  _rtChan = sb.channel(`registro-${Math.random().toString(36).slice(2)}`)
+  _rtChan = sb.channel("registro-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"formularios"}, ()=>{ fetchAll(); })
     .on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"}, async ()=>{
-      const locked = await isFormLocked().catch(()=>false);
+      const locked = await isFormLocked();
       updateLockButton(locked);
     })
     .on("postgres_changes",{event:"*",schema:"public",table:"formulario_liberacoes"}, ()=>{ /* nada visível aqui */ })
@@ -151,12 +67,12 @@ async function fetchAll(){
 }
 
 function render(){
-  const restrictedServer = CURRENT_SERVIDOR; // forces filter
+  const restrictedServer = isSuperAdmin()?null:CURRENT_SERVIDOR; // forces filter
   const list=allSubs.filter(s=>{
     if(!SERVIDORES.includes(s.servidor)) return false;
     if(restrictedServer && s.servidor !== restrictedServer) return false;
     if(filterServer && s.servidor!==filterServer) return false;
-    if(searchEmail && ![s.nick,s.rg,isSuperAdmin()?s.email:null].filter(Boolean).some(v=>String(v).toLowerCase().includes(searchEmail.toLowerCase()))) return false;
+    if(searchEmail && ![s.nick,s.rg,isSuperAdmin()?s.email:""].some(v=>String(v||"").toLowerCase().includes(searchEmail.toLowerCase()))) return false;
     return true;
   });
   const items = loading
@@ -164,11 +80,11 @@ function render(){
     : (list.length?list.map((s,i)=>`
     <div class="entry" data-id="${s.id}">
       <div class="entry-top">
-        <div class="entry-main" style="cursor:pointer" onclick="location.href='/detalhe.html?id=${s.id}'">
+        <div class="entry-main" onclick="location.href='/detalhe.html?id=${s.id}'">
           <span class="entry-num">${i+1}.</span>
           <div class="meta">
-            <span class="name">${escapeHtml(s.nick||"—")} <span style="color:var(--muted);font-weight:400">· ${escapeHtml(s.servidor||"")}</span></span>
-            <span class="sub">${isSuperAdmin()?escapeHtml(s.email||""):"RG: "+escapeHtml(s.rg||"—")}</span>
+            <span class="name">${escapeHtml(s.nick||"—")} <span>· ${escapeHtml(s.servidor||"")}</span></span>
+            <span class="sub">RG ${escapeHtml(s.rg||"—")}</span>${isSuperAdmin()?`<span class="sub">${escapeHtml(s.email||"")}</span>`:""}
             <span class="sub">${fmtDate(s.createdAt)}</span>
           </div>
         </div>
@@ -179,33 +95,33 @@ function render(){
     </div>`).join(""):`<p class="subtitle">Nenhum formulário encontrado com esses filtros.</p>`);
 
   const serverBadge = restrictedServer
-    ? `<p class="subtitle" style="margin-top:.2rem">Servidor: <strong>${escapeHtml(restrictedServer)}</strong></p>`
-    : (isSuperAdmin() ? `<p class="subtitle" style="margin-top:.2rem">Servidor: <strong>Todos os servidores</strong></p>` : "");
+    ? `<p class="subtitle">Servidor: <strong>${escapeHtml(restrictedServer)}</strong></p>`
+    : (isSuperAdmin() ? `<p class="subtitle">Servidor: <strong>Todos os servidores</strong></p>` : "");
 
   document.getElementById("main-content").innerHTML=`
     <div class="card">
-      <div class="registro-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+      <div class="registro-header">
         <div>
           <h1>Registro de Inscrições</h1>
-          <p class="subtitle">${list.length} de ${allSubs.length} formulário(s)${loadError?` · <span style="color:var(--danger)">${escapeHtml(loadError)}</span>`:""}</p>
-          <p class="subtitle" style="margin-top:.2rem">Logado como <strong>${escapeHtml(CURRENT_NICK||CURRENT_USER.name)}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
+          <p class="subtitle">${list.length} de ${allSubs.length} formulário(s)${loadError?` · <span>${escapeHtml(loadError)}</span>`:""}</p>
+          <p class="subtitle">Logado como <strong>${escapeHtml(CURRENT_USER.nick||"Membro")}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
           ${serverBadge}
         </div>
-        <div class="btn-group registro-actions" style="margin:0;flex-wrap:wrap">
-          ${canLockForms()?`<button class="btn btn-outline" id="btnLock" style="padding:.5rem .8rem;font-size:.85rem"><span id="btnLockIcon">${icon("lock",16)}</span> <span id="btnLockLabel">Trancar formulário</span></button>`:""}
+        <div class="btn-group registro-actions">
+          ${isMapper()?`<button class="btn btn-outline" id="btnLock"><span id="btnLockIcon">${icon("lock",16)}</span> <span id="btnLockLabel">Trancar formulário</span></button>`:""}
 
-          ${canManageMembers()?`<button class="btn btn-outline" id="btnLiberar" style="padding:.5rem .8rem;font-size:.85rem">${icon("unlock",16)} Liberar reenvio</button>`:""}
+          ${canManageMembers()?`<button class="btn btn-outline" id="btnLiberar">${icon("unlock",16)} Liberar reenvio</button>`:""}
           <button class="btn btn-primary" id="btnAnalista">${icon("plus")} Equipe Mappes</button>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 240px;gap:.75rem;margin-top:1rem" class="filters">
-        <div class="field" style="margin:0;padding:.85rem 1rem">
-          <label style="margin-bottom:.4rem;font-size:.9rem">Pesquisar por nick, RG${isSuperAdmin()?" ou e-mail":""}</label>
-          <input id="searchEmail" placeholder="Pesquisar..." value="${escapeHtml(searchEmail)}" />
+      <div class="filters">
+        <div class="field">
+          <label>🔎 Pesquisar por nick ou RG</label>
+          <input id="searchEmail" placeholder="Nick, RG ou e-mail (cargos gerais)" value="${escapeHtml(searchEmail)}" />
         </div>
-        <div class="field" style="margin:0;padding:.85rem 1rem">
-          <label style="margin-bottom:.4rem;font-size:.9rem">Filtrar por servidor</label>
+        <div class="field">
+          <label>Filtrar por servidor</label>
           <select id="filterServer" ${restrictedServer?"disabled":""}>
             <option value="">${restrictedServer?restrictedServer:"Todos os servidores"}</option>
             ${SERVIDORES.map(sv=>`<option ${filterServer===sv?"selected":""}>${sv}</option>`).join("")}
@@ -213,7 +129,7 @@ function render(){
         </div>
       </div>
 
-      <div class="entry-list" style="margin-top:1.25rem">${items}</div>
+      <div class="entry-list">${items}</div>
     </div>`;
 
   const se=document.getElementById("searchEmail");
@@ -224,25 +140,29 @@ function render(){
   document.getElementById("btnAnalista").onclick = openAnalistaPanel;
   const bl = document.getElementById("btnLiberar");
   if(bl) bl.onclick = openLiberarModal;
-  const lockBtn = document.getElementById("btnLock");
-  if(lockBtn){
-    (async ()=>{
-      const locked = await isFormLocked().catch(()=>false);
-      updateLockButton(locked);
-    })();
-    lockBtn.onclick = openLockModal;
+  const lockBtn=document.getElementById("btnLock");if(lockBtn)lockBtn.onclick=openLockPanel;
+}
+function modal(title,content){const wrap=document.createElement("div");wrap.className="modal-backdrop";wrap.innerHTML=`<section class="modal-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><header class="modal-heading"><h2>${escapeHtml(title)}</h2><button class="icon-btn" title="Fechar" aria-label="Fechar">${icon("x")}</button></header>${content}</section>`;document.body.appendChild(wrap);const close=()=>{wrap.remove();document.removeEventListener('keydown',keys);};function keys(e){if(e.key==='Escape')close();if(e.key==='Tab'){const controls=[...wrap.querySelectorAll('button,input,select,textarea')].filter(x=>!x.disabled);const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}document.addEventListener('keydown',keys);wrap.querySelector('header button').onclick=close;wrap.addEventListener('click',e=>{if(e.target===wrap)close();});wrap.querySelector('button')?.focus();return {wrap,close};}
+async function openLockPanel(){const {wrap}=modal("Formulários por servidor",'<div id="serverLocks">Carregando...</div>');const box=wrap.querySelector('#serverLocks');async function refresh(){try{const servers=allowedServers();const locks=await Promise.all(servers.map(isFormLocked));box.innerHTML=servers.map((sv,i)=>`<div class="server-lock-row"><div><strong>${sv}</strong><span class="sub">${locks[i]?"Inscrições trancadas":"Inscrições abertas"}</span></div><button class="btn btn-outline" data-server="${sv}" data-lock="${!locks[i]}">${icon(locks[i]?"unlock":"lock",16)} ${locks[i]?"Destrancar":"Trancar"}</button></div>`).join('');box.querySelectorAll('button').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await setFormLocked(b.dataset.lock==='true',b.dataset.server);toast('Status atualizado');await refresh();}catch(e){toast(e.message,'error');b.disabled=false;}});}catch(e){box.textContent=e.message;}}await refresh();}
+
+function updateLockButton(locked){
+  const btn = document.getElementById("btnLock");
+  const label = document.getElementById("btnLockLabel");
+  const ic = document.getElementById("btnLockIcon");
+  if(!btn || !label) return;
+  if(locked){
+    label.textContent = "Destrancar formulário";
+    if(ic) ic.innerHTML = icon("unlock",16);
+    btn.style.borderColor = "var(--success)";
+    btn.style.color = "var(--success)";
+  }else{
+    label.textContent = "Trancar formulário";
+    if(ic) ic.innerHTML = icon("lock",16);
+    btn.style.borderColor = "";
+    btn.style.color = "";
   }
 }
 
-function updateLockButton(){const label=document.getElementById("btnLockLabel");if(label)label.textContent="Trancar formulário";}
-async function openLockModal(){
- const w=createModal("Trancamento por servidor",`<label for="lockServer">Servidor</label><select id="lockServer">${allowedServers().map(s=>`<option>${s}</option>`).join("")}</select><p id="lockState" class="subtitle"></p><div class="btn-group"><button id="lockConfirm" class="btn btn-primary">Confirmar</button><button id="lockCancel" class="btn btn-outline">Cancelar</button></div>`);
- let locked=false;
- async function refresh(){try{locked=await isFormLocked(w.querySelector("#lockServer").value);w.querySelector("#lockState").textContent=locked?"Trancado":"Aberto";w.querySelector("#lockConfirm").textContent=locked?"Destrancar":"Trancar";}catch(e){toast(e.message,"error");}}
- w.querySelector("#lockServer").onchange=refresh;w.querySelector("#lockCancel").onclick=()=>w.remove();
- w.querySelector("#lockConfirm").onclick=async e=>{e.target.disabled=true;try{await setFormLocked(!locked,w.querySelector("#lockServer").value);toast(!locked?"Formulário trancado":"Formulário destrancado");w.remove();}catch(err){toast(err.message,"error");e.target.disabled=false;}};await refresh();
-}
-function createModal(title,body){const w=document.createElement("div");w.className="modal-backdrop";w.innerHTML=`<section class="modal-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><h2>${title}</h2>${body}</section>`;document.body.appendChild(w);const previous=document.activeElement;const close=()=>{w.remove();previous?.focus();};w.addEventListener("click",e=>{if(e.target===w)close();});w.addEventListener("keydown",e=>{if(e.key==="Escape")close();if(e.key==="Tab"){const nodes=[...w.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)')];const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}});w.querySelector("input,select,textarea,button")?.focus();return w;}
 
 function openLiberarModal(){
   const wrap = document.createElement("div");
@@ -250,25 +170,25 @@ function openLiberarModal(){
   wrap.innerHTML = `
     <div class="modal-card">
       <h2>Liberar reenvio do formulário</h2>
-      <p class="subtitle" style="margin:.2rem 0 .8rem">Permite ao usuário reenviar o formulário antes do prazo de 48h. Informe os dados exatos do envio anterior.</p>
-      <label class="subtitle" style="margin-top:.4rem;display:block">E-mail</label>
+      <p class="subtitle">Permite ao usuário reenviar o formulário antes do prazo de 48h. Informe os dados exatos do envio anterior.</p>
+      <label class="subtitle">E-mail</label>
       <input id="libEmail" type="email" placeholder="exemplo@gmail.com" />
-      <label class="subtitle" style="margin-top:.6rem;display:block">Nick</label>
+      <label class="subtitle">Nick</label>
       <input id="libNick" placeholder="Nick do jogador" />
-      <div class="row-two" style="margin-top:.6rem">
+      <div class="row-two">
         <div>
-          <label class="subtitle" style="display:block">Servidor</label>
+          <label class="subtitle">Servidor</label>
           <select id="libServidor">
             <option value="" disabled selected>Selecione</option>
             ${allowedServers().map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
           </select>
         </div>
         <div>
-          <label class="subtitle" style="display:block">RG</label>
+          <label class="subtitle">RG</label>
           <input id="libRg" placeholder="RG" />
         </div>
       </div>
-      <div class="stack" style="margin-top:1rem">
+      <div class="stack">
         <button class="btn btn-primary" id="libConfirm">${icon("unlock",16)} Liberar reenvio</button>
         <button class="btn btn-outline" id="libCancel">Cancelar</button>
       </div>
@@ -294,28 +214,13 @@ function openLiberarModal(){
   setTimeout(()=>wrap.querySelector("#libEmail").focus(), 50);
 }
 
-async function openAnalistaPanel(){
- const w=createModal("Equipe Mappes",`<div id="membersList" class="members-list"></div><div class="btn-group">${canManageMembers()?'<button class="btn btn-primary" id="addMember">Adicionar membro</button>':""}<button class="btn btn-outline" id="closePanelBtn">Fechar</button></div>`);
- w.querySelector(".modal-card").classList.add("team-modal");w.querySelector("#closePanelBtn").onclick=()=>w.remove();const add=w.querySelector("#addMember");if(add)add.onclick=()=>openAddModal(null,()=>loadMembers(w));await loadMembers(w);
-}
-async function loadMembers(w){
- const box=w.querySelector("#membersList");box.textContent="Carregando...";
- try{const members=await rpc("mapper_list_members");box.innerHTML=members.map(m=>`<article class="member-row"><div class="member-info"><strong>${escapeHtml(m.nick||"Nick não informado")}</strong><span class="subtitle">RG: ${escapeHtml(m.rg||"Não informado")} · ${escapeHtml(m.servidor||"Todos os servidores")}</span><span class="subtitle">${roleLabel(m.role)}</span>${isSuperAdmin()?`<span class="subtitle">${escapeHtml(m.email)}</span>`:""}</div><div class="member-actions">${canManageTarget(m)?`<button class="icon-btn" data-edit="${m.member_id}" title="Editar membro" aria-label="Editar ${escapeHtml(m.nick||"membro")}">${icon("edit",16)}</button><button class="icon-btn" data-remove="${m.member_id}" title="Remover membro" aria-label="Remover ${escapeHtml(m.nick||"membro")}">${icon("trash",16)}</button>`:m.protected?'<span class="subtitle">Protegido</span>':""}</div></article>`).join("");
- box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openAddModal(members.find(m=>m.member_id===b.dataset.edit),()=>loadMembers(w)));
- box.querySelectorAll("[data-remove]").forEach(b=>b.onclick=async()=>{const m=members.find(m=>m.member_id===b.dataset.remove);if(!confirm(`Remover ${m.nick||"este membro"}?`))return;try{await rpc("mapper_remove_member",{_member_id:m.member_id});await loadMembers(w);toast("Membro removido");}catch(e){toast(e.message,"error");}});
- }catch(e){box.textContent=e.message;}
-}
-function openAddModal(member,onDone){
- const roles=allowedRoles();if(!roles.length)return;
- const w=createModal(member?"Editar membro":"Adicionar membro",`<form id="memberForm"><label for="newEmail">E-mail</label><input id="newEmail" type="email" ${member&&!isSuperAdmin()?"hidden":"required"} value="${escapeHtml(member?.email||"")}"/><label for="newRole">Cargo</label><select id="newRole">${roles.map(r=>`<option value="${r}" ${r===member?.role?"selected":""}>${roleLabel(r)}</option>`).join("")}</select><label for="newNick">Nick</label><input id="newNick" required value="${escapeHtml(member?.nick||"")}"/><label for="newRg">RG</label><input id="newRg" required value="${escapeHtml(member?.rg||"")}"/><label for="newServidor">Servidor</label><select id="newServidor">${allowedServers().map(s=>`<option ${s===member?.servidor?"selected":""}>${s}</option>`).join("")}<option value="">Todos os servidores</option></select><div class="btn-group"><button type="submit" class="btn btn-primary">Salvar</button><button type="button" id="memberCancel" class="btn btn-outline">Cancelar</button></div></form>`);
- w.classList.add("modal-front");if(member&&!isSuperAdmin())w.querySelector('label[for="newEmail"]').hidden=true;
- function sync(){const general=["responsavel_geral","aux_responsavel_geral"].includes(w.querySelector("#newRole").value);const sv=w.querySelector("#newServidor");sv.querySelector('option[value=""]').hidden=!general;sv.disabled=general;if(general)sv.value="";else if(!sv.value)sv.value=allowedServers()[0];}w.querySelector("#newRole").onchange=sync;sync();
- w.querySelector("#memberCancel").onclick=()=>w.remove();w.querySelector("#memberForm").onsubmit=async e=>{e.preventDefault();const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;try{await addMapperRole(w.querySelector("#newEmail").value,w.querySelector("#newRole").value,w.querySelector("#newServidor").value||null,w.querySelector("#newNick").value,w.querySelector("#newRg").value,member?.member_id||null);toast("Membro salvo");w.remove();await onDone();}catch(err){toast(err.message,"error");btn.disabled=false;}};
-}
+async function openAnalistaPanel(){const {wrap,close}=modal("Equipe Mappes",`<div class="team-toolbar"><span class="subtitle">${roleLabel(CURRENT_ROLE)}</span>${canManageMembers()?`<button class="btn btn-primary" id="addMember">${icon('plus',16)} Adicionar membro</button>`:''}</div><div id="membersList">Carregando...</div>`);if(canManageMembers())wrap.querySelector('#addMember').onclick=()=>openMemberEditor(null,()=>loadMembers(wrap));await loadMembers(wrap);}
+async function loadMembers(wrap){const box=wrap.querySelector('#membersList');try{const data=await rpc('mapper_list_members');box.innerHTML=(data||[]).map(m=>{const manage=!m.protected&&!m.self&&canGrant(m.role,m.servidor);return `<article class="member-row"><div class="member-avatar">${icon('user',18)}</div><div class="member-info"><strong>${escapeHtml(m.nick||'Nick não informado')}</strong><div class="sub">RG ${escapeHtml(m.rg||'—')} · ${escapeHtml(m.servidor||'Todos os servidores')}</div><span class="role-tag">${roleLabel(m.role)}</span>${isSuperAdmin()?`<div class="sub">${escapeHtml(m.email||'')}</div>`:''}</div><div class="member-actions">${manage?`<button class="icon-btn" data-edit="${m.member_id}" aria-label="Editar ${escapeHtml(m.nick||'membro')}" title="Editar">${icon('edit',16)}</button><button class="icon-btn danger" data-remove="${m.member_id}" aria-label="Remover ${escapeHtml(m.nick||'membro')}" title="Remover">${icon('trash',16)}</button>`:m.protected?'<span class="sub">Protegido</span>':''}</div></article>`;}).join('')||'<p class="subtitle">Nenhum membro cadastrado.</p>';box.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openMemberEditor(data.find(m=>m.member_id===b.dataset.edit),()=>loadMembers(wrap)));box.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{const m=data.find(m=>m.member_id===b.dataset.remove);if(!confirm(`Remover ${m.nick||'membro'}?`))return;b.disabled=true;try{await rpc('mapper_remove_member',{_member_id:m.member_id});toast('Membro removido');await loadMembers(wrap);}catch(e){toast(e.message,'error');b.disabled=false;}});}catch(e){box.textContent=e.message;}}
+function openMemberEditor(member,onDone){const roles=['aux_responsavel_geral','responsavel','auxiliar'].filter(r=>canGrant(r,CURRENT_SERVIDOR||'Servidor 1'));const emailVisible=!member||isSuperAdmin();const servers=allowedServers();const {wrap,close}=modal(member?'Editar membro':'Adicionar membro',`<form id="memberForm"><div class="editor-grid">${emailVisible?`<label>E-mail<input required type="email" name="email" value="${escapeHtml(member?.email||'')}" autocomplete="email"></label>`:''}<label>Cargo<select name="role" required>${roles.map(r=>`<option value="${r}" ${member?.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select></label><label>Nick<input name="nick" required value="${escapeHtml(member?.nick||'')}"></label><label>RG<input name="rg" required value="${escapeHtml(member?.rg||'')}"></label><label class="full">Servidor<select name="servidor" required>${servers.map(s=>`<option ${member?.servidor===s?'selected':''}>${s}</option>`).join('')}</select></label></div><div class="btn-group"><button class="btn btn-primary" type="submit">Salvar membro</button></div></form>`);const form=wrap.querySelector('form');const role=form.elements.role,server=form.elements.servidor;function updateServer(){server.disabled=role.value==='aux_responsavel_geral';server.required=!server.disabled;}role.onchange=updateServer;updateServer();form.onsubmit=async e=>{e.preventDefault();if(!form.reportValidity())return;const d=Object.fromEntries(new FormData(form));const b=form.querySelector('[type=submit]');b.disabled=true;try{await rpc('mapper_save_member',{_member_id:member?.member_id||null,_email:d.email||null,_role:d.role,_nick:d.nick,_rg:d.rg,_servidor:server.disabled?null:d.servidor});toast('Membro salvo');close();await onDone();}catch(err){toast(err.message,'error');b.disabled=false;}};}
 
 function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}
 
-startPage(bootstrap);
+bootstrap();
 </script>
 </body>
 </html>

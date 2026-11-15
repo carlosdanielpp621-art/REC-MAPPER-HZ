@@ -14,56 +14,37 @@ const sb = (typeof window !== "undefined" && window.supabase)
 
 /* ---------- Utils ---------- */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
-function loadSubs(){return []}
-function saveSubs(list){}
+function loadSubs(){return [];}
+function saveSubs(){}
 function fmtDate(ts){return new Date(ts).toLocaleString("pt-BR")}
 
 /* ---------- Auth + cargos ---------- */
 let CURRENT_USER = null;      // { email, name }
 let CURRENT_ROLE = null;      // 'responsavel' | 'auxiliar' | 'super_admin' | null
-let CURRENT_SERVIDOR = null;
-let CURRENT_NICK = null;  // 'Servidor X' | null (todos)
-const SUPER_ADMIN_EMAIL = "criarp21@gmail.com";
+let CURRENT_SERVIDOR = null;  // 'Servidor X' | null (todos)
+
 
 async function refreshAuth(){
-  if(!sb) throw new Error("O acesso ao Supabase não carregou. Atualize a página.");
-  const sessionResult = await withPageTimeout(sb.auth.getSession());
-  if(sessionResult.error) throw sessionResult.error;
-  const session = sessionResult.data?.session || null;
-  CURRENT_USER = session?.user ? {
-    email: (session.user.email||"").toLowerCase(),
-    name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
-  } : null;
-  CURRENT_ROLE = null;
-  CURRENT_SERVIDOR = null;
-  CURRENT_NICK = null;
-  if(CURRENT_USER){
-      const { data, error } = await withPageTimeout(sb.rpc("mapper_current_identity"));
-      if(error) throw error;
-      CURRENT_NICK = data?.nick || null;
-      CURRENT_ROLE = data?.role || null;
-      CURRENT_SERVIDOR = data?.servidor || null;
-  }
-  return { user: CURRENT_USER, role: CURRENT_ROLE, servidor: CURRENT_SERVIDOR };
+  if(!sb) return {user:null,role:null};
+  const {data:{session},error}=await sb.auth.getSession(); if(error) throw error;
+  CURRENT_USER=session?.user ? {email:session.user.email,name:session.user.user_metadata?.full_name||"Membro"}:null;
+  CURRENT_ROLE=null; CURRENT_SERVIDOR=null;
+  if(CURRENT_USER){ const identity=await rpc("mapper_current_identity"); CURRENT_ROLE=identity?.role||null; CURRENT_SERVIDOR=identity?.servidor||null; CURRENT_USER.nick=identity?.nick; }
+  return {user:CURRENT_USER,role:CURRENT_ROLE,servidor:CURRENT_SERVIDOR};
 }
-
-function isMapper(){ return ["responsavel_geral","aux_responsavel_geral","responsavel","auxiliar"].includes(CURRENT_ROLE); }
-function isSuperAdmin(){ return ["responsavel_geral","aux_responsavel_geral"].includes(CURRENT_ROLE); }
-function isRootSuperAdmin(){ return CURRENT_ROLE === "responsavel_geral"; }
-function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsavel"; }
-function canLockForms(){ return isMapper(); }
-function canReview(){ return canManageMembers(); }
-function allowedServers(){ return isSuperAdmin() ? ["Servidor 1","Servidor 2","Servidor 3"] : [CURRENT_SERVIDOR].filter(Boolean); }
-function allowedRoles(){ return CURRENT_ROLE === "responsavel_geral" ? ["responsavel_geral","aux_responsavel_geral","responsavel","auxiliar"] : CURRENT_ROLE === "aux_responsavel_geral" ? ["responsavel","auxiliar"] : CURRENT_ROLE === "responsavel" ? ["auxiliar"] : []; }
-function canManageTarget(m){ return !m.protected && !m.self && allowedRoles().includes(m.role) && (isSuperAdmin() || m.servidor === CURRENT_SERVIDOR); }
-async function rpc(name,args={}){ if(!sb)throw new Error("O acesso ao Supabase não carregou.");const {data,error}=await withPageTimeout(sb.rpc(name,args)); if(error) throw error; return data; }
+async function rpc(name,args={}){ if(!sb) throw new Error("Sem conexão com Supabase"); const {data,error}=await sb.rpc(name,args); if(error) throw error; return data; }
+function isMapper(){return ["responsavel_geral","aux_responsavel_geral","responsavel","auxiliar"].includes(CURRENT_ROLE);}
+function isSuperAdmin(){return ["responsavel_geral","aux_responsavel_geral"].includes(CURRENT_ROLE);}
+function isRootSuperAdmin(){return CURRENT_ROLE==="responsavel_geral";}
+function canManageMembers(){return isSuperAdmin()||CURRENT_ROLE==="responsavel";}
+function canGrant(role,server){return CURRENT_ROLE==="responsavel_geral" ? ["aux_responsavel_geral","responsavel","auxiliar"].includes(role) : CURRENT_ROLE==="aux_responsavel_geral" ? ["responsavel","auxiliar"].includes(role) : CURRENT_ROLE==="responsavel" && role==="auxiliar" && server===CURRENT_SERVIDOR;}
+function allowedServers(){return isSuperAdmin()?["Servidor 1","Servidor 2","Servidor 3"]:CURRENT_SERVIDOR?[CURRENT_SERVIDOR]:[];}
 async function signInGoogle(){
-  if(!sb) throw new Error("O acesso ao Supabase não carregou.");
-  const {error} = await withPageTimeout(sb.auth.signInWithOAuth({
+  if(!sb) return;
+  await sb.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: window.location.origin + "/registro.html" }
-  }));
-  if(error) throw error;
+  });
 }
 async function signOut(){
   if(sb) await sb.auth.signOut();
@@ -97,13 +78,13 @@ function renderPanel({active="inicio"}={}){
   <header class="topbar">
     <div class="topbar-left">
       <button class="icon-btn" id="toggleSidebar" title="Recolher menu">${icon("menu")}</button>
-      <img class="brand-logo" src="/assets/logo.svg.png" alt="REC Mapper" />
+      <img class="brand-logo" src="/__l5e/assets-v1/331cc622-0b60-4087-a32d-2689c5ef7751/rec-mapper-logo.png" alt="REC Mapper" />
     </div>
     <div class="topbar-right">
-      ${showNotif?`<div style="position:relative" id="notifWrap">
-        <button class="icon-btn" id="notifBtn" title="Notificações" style="position:relative">
+      ${showNotif?`<div class="notification-wrap" id="notifWrap">
+        <button class="icon-btn notification-wrap" id="notifBtn" title="Notificações">
           ${icon("bell")}
-          <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+          <span class="notif-badge" id="notifBadge" hidden>0</span>
         </button>
         <div class="notif-panel" id="notifPanel">
           <div class="notif-header">
@@ -115,7 +96,7 @@ function renderPanel({active="inicio"}={}){
           </div>
         </div>
       </div>`:""}
-      <div class="avatar" title="${user?escapeHtml(CURRENT_NICK||user.name):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
+      <div class="avatar" title="${user?escapeHtml(user.nick||user.name):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
       ${user
         ? `<button class="icon-btn" id="logoutBtn" title="Sair">${icon("log-out")}</button>`
         : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login.html'">${icon("log-in")}</button>`}
@@ -283,11 +264,7 @@ function buildDiscordFields(sub, responsavelEmail){
   });
   return fields;
 }
-async function sendDiscord(sub,action){
-  const session=(await sb.auth.getSession()).data.session;
-  const response=await fetch("/api/public/mapper-delivery",{method:"POST",headers:{"Content-Type":"application/json",...(session?{Authorization:`Bearer ${session.access_token}`}:{})},body:JSON.stringify({id:sub.id,receipt:sub.receipt||null,action})});
-  if(!response.ok){toast("Formulário salvo; aviso ao Discord pendente.","error");return false;} return true;
-}
+async function sendDiscord(){ /* Entrega feita pela fila protegida no servidor. */ }
 /* ---------- Supabase (formulários) ---------- */
 function mapToRow(d){
   const yes = v => String(v||"").toLowerCase().startsWith("s");
@@ -320,8 +297,6 @@ function isMissingColumnError(error){
   const msg = (error.message||"") + " " + (error.details||"") + " " + (error.hint||"");
   return /schema cache|column .* does not exist|Could not find the/i.test(msg);
 }
-async function tryInsertRow(row){ return await sb.from("formularios").insert(row).select().single(); }
-
 async function getUserIp(){
   try{ const r=await fetch("https://api.ipify.org?format=json"); const j=await r.json(); return j.ip||null;
   }catch{ try{ const r2=await fetch("https://ipapi.co/json/"); const j2=await r2.json(); return j2.ip||null; }catch{return null;} }
@@ -342,15 +317,12 @@ function getUserAgent(){
 /* ---------- Bloqueio 48h + liberação ---------- */
 const REENVIO_MS = 48 * 60 * 60 * 1000; // 48 horas
 
-async function createLiberacao({email,nick,servidor,rg}){ await rpc("mapper_create_release",{_email:email,_nick:nick,_servidor:servidor,_rg:rg});return email; }
-
-async function saveToSupabase(data){
-  if(await isFormLocked(data.servidor)) throw new Error("Formulário trancado para este servidor");
-  return await rpc("mapper_submit_with_receipt",{_data:mapToRow(data)});
-}
-async function loadSubsFromSupabase(){ return (await rpc("mapper_list_forms",{_id:null})||[]).map(rowToSub); }
-async function loadSubFromSupabase(id){const rows=await rpc("mapper_list_forms",{_id:Number(id)});return rows?.[0]?rowToSub(rows[0]):null;}
-async function updateStatusSupabase(id,status,motivo="",revision=false){return await rpc("mapper_decide_form",{_id:Number(id),_status:status,_motivo:motivo,_revision:revision});}
+async function createLiberacao(d){return rpc("mapper_create_release",{_email:d.email,_nick:d.nick,_servidor:d.servidor,_rg:d.rg});}
+async function saveToSupabase(d){const result=await rpc("mapper_submit_with_receipt",{_data:mapToRow(d)}); await requestDelivery(result.receipt);return result;}
+async function requestDelivery(receipt){if(!receipt) return;try{const response=await fetch('/api/public/mapper-delivery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({receipt})});if(!response.ok) console.warn('Entrega Discord pendente; inscrição salva.');}catch{console.warn('Entrega Discord pendente; inscrição salva.');}}
+async function loadSubsFromSupabase(){let rows=[],start=0;while(true){const {data,error}=await sb.rpc("mapper_list_forms",{_id:null}).range(start,start+499);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<500)break;start+=500;}return rows.map(rowToSub);}
+async function loadSubFromSupabase(id){const data=await rpc("mapper_list_forms",{_id:Number(id)});return data?.[0]?rowToSub(data[0]):null;}
+async function updateStatusSupabase(id,status,motivo="",revision=false){const result=await rpc("mapper_decide_form",{_id:Number(id),_status:status,_motivo:motivo,_revision:revision});if(status==='approved'||status==='rejected'){try{const {data:{session}}=await sb.auth.getSession();await fetch('/api/public/mapper-delivery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({formId:Number(id),action:status})});}catch{console.warn('Décision sauvegardée; livraison Discord en attente.');}}return result;}
 function rowToSub(r){
   return {
     id: r.id,
@@ -371,26 +343,10 @@ function rowToSub(r){
 }
 
 /* ---------- Cargos (mapper_roles) ---------- */
-async function addMapperRole(email,role,servidor,nick,rg,member_id=null){await rpc("mapper_save_member",{_member_id:member_id,_email:email,_role:role,_servidor:servidor,_nick:nick,_rg:rg});return email;}
-async function isFormLocked(servidor){
-  let query=sb.from("formulario_config").select("locked,servidor");
-  if(servidor)query=query.eq("servidor",servidor);
-  const {data,error}=await query;if(error)throw error;
-  return servidor ? !!data?.[0]?.locked : data?.length===3 && data.every(r=>r.locked);
-}
-async function setFormLocked(locked,servidor){
-  if(!allowedServers().includes(servidor))throw new Error("Servidor fora da sua permissão");
-  const {data,error}=await sb.from("formulario_config").update({locked,locked_by:CURRENT_USER.email,locked_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("servidor",servidor).select("servidor,locked");
-  if(error)throw error;if(data?.length!==1)throw new Error("Não foi possível alterar este servidor");
-}
-
+async function isFormLocked(server){if(!sb)throw new Error("Sem conexão");const {data,error}=await sb.from("formulario_config").select("servidor,locked");if(error)throw error;return server ? !!data?.find(x=>x.servidor===server)?.locked : data?.length===3&&data.every(x=>x.locked);}
+async function setFormLocked(locked,server){return rpc("mapper_set_form_locked",{_servidor:server,_locked:locked});}
 /* ---------- Notificações ---------- */
-async function createNotification({tipo,titulo,mensagem,formulario_id=null,ator=null}){
-  if(!sb) return;
-  try{
-    await sb.from("notifications").insert({tipo,titulo,mensagem:mensagem||null,formulario_id,ator});
-  }catch(e){ console.warn("createNotification",e); }
-}
+async function createNotification(){ /* Notificações são criadas nas operações protegidas. */ }
 async function loadNotifications(){
   const list = document.getElementById("notifList");
   const badge = document.getElementById("notifBadge");
@@ -402,8 +358,8 @@ async function loadNotifications(){
     const items = data||[];
     const unread = items.filter(n=>!n.lida).length;
     if(badge){
-      if(unread>0){ badge.style.display="inline-flex"; badge.textContent = unread>99?"99+":String(unread); }
-      else{ badge.style.display="none"; }
+      if(unread>0){ badge.hidden=false; badge.textContent = unread>99?"99+":String(unread); }
+      else{ badge.hidden=true; }
     }
     if(!items.length){ list.innerHTML = `<div class="notif-empty">Nenhuma notificação</div>`; return; }
     list.innerHTML = items.map(n=>{
@@ -453,8 +409,25 @@ function notifIcon(tipo){
 }
 
 /* ---------- Delete + Update formulário ---------- */
-async function deleteFormularioSupabase(id){await rpc("mapper_delete_form",{_id:Number(id)});}
-async function updateFormularioSupabase(id,data){const row=mapToRow(data);if(!isSuperAdmin())delete row.email;await rpc("mapper_edit_form",{_id:Number(id),_data:row});}
+async function deleteFormularioSupabase(id){return rpc("mapper_delete_form",{_id:Number(id)});}
+async function updateFormularioSupabase(id, data){
+  if(!sb) throw new Error("Supabase não disponível");
+  const yes = v => String(v||"").toLowerCase().startsWith("s");
+  const row = {
+    ...(data.email?{email:data.email}:{}), servidor: data.servidor||null, nick: data.nick||null,
+    rg: data.rg||null, discord: data.discord||null, "número": data.numero||null,
+    idade: data.idade||null, level: data.level||null,
+    org_corp: normalizeOrgCorp(data.orgCorp), plataforma: data.plataforma||null,
+    tipo_rp: data.rp||null,
+    experiencia_mapeacao: yes(data.expMap), experiencia_administracao: yes(data.expAdm),
+    motivo_mapper: data.motivo||null, nivel_mapeamento: data.nivel||null,
+    tempo_cidade: data.tempoCidade||null, caracteristicas_mapper: data.caracteristicas||null,
+    responsabilidade_propriedades: data.responsabilidade||null,
+    resolucao_erros_mapeamento: data.erro||null,
+  };
+  await rpc("mapper_edit_form",{_id:Number(id),_data:row});
+}
+
 /* ---------- Icon extras ---------- */
 (function addExtraIcons(){
   const orig = icon;
@@ -472,3 +445,6 @@ async function updateFormularioSupabase(id,data){const row=mapToRow(data);if(!is
     return orig(name,size);
   };
 })();
+
+function associateLabels(){document.querySelectorAll('.field').forEach((field,i)=>{const control=field.querySelector('input:not([type=radio]),select,textarea');const label=field.querySelector('label');if(control&&label){control.id='field-'+i;label.htmlFor=control.id;}});}
+new MutationObserver(associateLabels).observe(document.body,{childList:true,subtree:true});
