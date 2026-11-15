@@ -7,8 +7,9 @@
 <link rel="stylesheet" href="/assets/styles.css" />
 <meta property="og:title" content="Login — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Login."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Login."/></head>
 <body>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/assets/app.js"></script>
+<script src="/assets/startup.js?v=4"></script>
+<script src="/assets/supabase.min.js?v=4"></script>
+<script src="/assets/app.js?v=4"></script>
 <div class="center-page">
   <div class="card login-card">
     <div style="display:flex;justify-content:center;margin-bottom:.75rem">
@@ -43,9 +44,9 @@ function goBackOrHome(){
   }
 }
 
-document.getElementById("btnGoogle").onclick = signInGoogle;
+document.getElementById("btnGoogle").onclick = async ()=>{try{await signInGoogle();}catch(error){document.getElementById("statusMsg").textContent=error.message||"Não foi possível entrar. Tente novamente.";}};
 document.getElementById("btnBack").onclick = goBackOrHome;
-(async ()=>{
+startPage(async ()=>{
   await refreshAuth();
   if(CURRENT_USER){
     document.getElementById("statusMsg").innerHTML =
@@ -55,7 +56,7 @@ document.getElementById("btnBack").onclick = goBackOrHome;
     // Após login, redireciona para a página de Registro (mappers)
     setTimeout(()=>location.href="/registro.html", 1201);
   }
-})();
+});
 </script>
 </body>
 </html>

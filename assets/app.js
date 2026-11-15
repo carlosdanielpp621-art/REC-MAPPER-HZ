@@ -26,22 +26,23 @@ let CURRENT_NICK = null;  // 'Servidor X' | null (todos)
 const SUPER_ADMIN_EMAIL = "criarp21@gmail.com";
 
 async function refreshAuth(){
-  if(!sb) return {user:null, role:null};
-  const { data: { session } } = await sb.auth.getSession();
+  if(!sb) throw new Error("O acesso ao Supabase não carregou. Atualize a página.");
+  const sessionResult = await withPageTimeout(sb.auth.getSession());
+  if(sessionResult.error) throw sessionResult.error;
+  const session = sessionResult.data?.session || null;
   CURRENT_USER = session?.user ? {
     email: (session.user.email||"").toLowerCase(),
     name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
   } : null;
   CURRENT_ROLE = null;
   CURRENT_SERVIDOR = null;
+  CURRENT_NICK = null;
   if(CURRENT_USER){
-    try{
-      const { data, error } = await sb.rpc("mapper_current_identity");
+      const { data, error } = await withPageTimeout(sb.rpc("mapper_current_identity"));
       if(error) throw error;
       CURRENT_NICK = data?.nick || null;
       CURRENT_ROLE = data?.role || null;
       CURRENT_SERVIDOR = data?.servidor || null;
-    }catch(e){ console.warn(e); }
   }
   return { user: CURRENT_USER, role: CURRENT_ROLE, servidor: CURRENT_SERVIDOR };
 }
@@ -55,13 +56,14 @@ function canReview(){ return canManageMembers(); }
 function allowedServers(){ return isSuperAdmin() ? ["Servidor 1","Servidor 2","Servidor 3"] : [CURRENT_SERVIDOR].filter(Boolean); }
 function allowedRoles(){ return CURRENT_ROLE === "responsavel_geral" ? ["responsavel_geral","aux_responsavel_geral","responsavel","auxiliar"] : CURRENT_ROLE === "aux_responsavel_geral" ? ["responsavel","auxiliar"] : CURRENT_ROLE === "responsavel" ? ["auxiliar"] : []; }
 function canManageTarget(m){ return !m.protected && !m.self && allowedRoles().includes(m.role) && (isSuperAdmin() || m.servidor === CURRENT_SERVIDOR); }
-async function rpc(name,args={}){ const {data,error}=await sb.rpc(name,args); if(error) throw error; return data; }
+async function rpc(name,args={}){ if(!sb)throw new Error("O acesso ao Supabase não carregou.");const {data,error}=await withPageTimeout(sb.rpc(name,args)); if(error) throw error; return data; }
 async function signInGoogle(){
-  if(!sb) return;
-  await sb.auth.signInWithOAuth({
+  if(!sb) throw new Error("O acesso ao Supabase não carregou.");
+  const {error} = await withPageTimeout(sb.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: window.location.origin + "/registro.html" }
-  });
+  }));
+  if(error) throw error;
 }
 async function signOut(){
   if(sb) await sb.auth.signOut();

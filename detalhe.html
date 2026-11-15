@@ -8,8 +8,9 @@
 <meta property="og:title" content="Inscrição — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Inscrição."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Inscrição."/></head>
 <body>
 <div id="panel-root"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/assets/app.js"></script>
+<script src="/assets/startup.js?v=4"></script>
+<script src="/assets/supabase.min.js?v=4"></script>
+<script src="/assets/app.js?v=4"></script>
 <script>
 const id=new URLSearchParams(location.search).get("id");
 let sub=null;
@@ -167,7 +168,7 @@ async function copyForm(){
   }
 }
 
-bootstrap();
+startPage(bootstrap);
 </script>
 </body>
 </html>

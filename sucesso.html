@@ -8,10 +8,11 @@
 <meta property="og:title" content="Formulário enviado — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Formulário enviado."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Formulário enviado."/></head>
 <body>
 <div id="panel-root"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/assets/app.js"></script>
+<script src="/assets/startup.js?v=4"></script>
+<script src="/assets/supabase.min.js?v=4"></script>
+<script src="/assets/app.js?v=4"></script>
 <script>
-(async ()=>{
+startPage(async ()=>{
   await refreshAuth();
   renderPanel({active:"inicio"});
   document.getElementById("main-content").innerHTML = `
@@ -23,7 +24,7 @@
         <button class="btn btn-primary" onclick="location.href='/index.html'">Voltar ao início</button>
       </div>
     </div>`;
-})();
+});
 </script>
 </body>
 </html>

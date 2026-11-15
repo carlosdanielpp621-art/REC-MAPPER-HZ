@@ -92,8 +92,9 @@
 <meta property="og:title" content="Registro de Formulários — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Registro de Formulários."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Registro de Formulários."/></head>
 <body>
 <div id="panel-root"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/assets/app.js"></script>
+<script src="/assets/startup.js?v=4"></script>
+<script src="/assets/supabase.min.js?v=4"></script>
+<script src="/assets/app.js?v=4"></script>
 <script>
 const SERVIDORES = ["Servidor 1","Servidor 2","Servidor 3"];
 let filterServer="";
@@ -131,7 +132,7 @@ function subscribeRealtime(){
   _rtChan = sb.channel(`registro-${Math.random().toString(36).slice(2)}`)
     .on("postgres_changes",{event:"*",schema:"public",table:"formularios"}, ()=>{ fetchAll(); })
     .on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"}, async ()=>{
-      const locked = await isFormLocked();
+      const locked = await isFormLocked().catch(()=>false);
       updateLockButton(locked);
     })
     .on("postgres_changes",{event:"*",schema:"public",table:"formulario_liberacoes"}, ()=>{ /* nada visível aqui */ })
@@ -226,7 +227,7 @@ function render(){
   const lockBtn = document.getElementById("btnLock");
   if(lockBtn){
     (async ()=>{
-      const locked = await isFormLocked();
+      const locked = await isFormLocked().catch(()=>false);
       updateLockButton(locked);
     })();
     lockBtn.onclick = openLockModal;
@@ -314,7 +315,7 @@ function openAddModal(member,onDone){
 
 function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}
 
-bootstrap();
+startPage(bootstrap);
 </script>
 </body>
 </html>
