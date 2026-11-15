@@ -27,7 +27,7 @@ async function bootstrap(){
     document.getElementById("main-content").innerHTML = `
       <div class="card">
         <h1>Acesso negado</h1>
-        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_USER.nick||"Membro")}</strong> não possui cargo autorizado.</p>
+        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_USER.email)}</strong> não possui cargo autorizado.</p>
         <div class="btn-group">
           <button class="btn btn-outline" onclick="signOut()">Sair</button>
           <button class="btn btn-primary" onclick="location.href='/index.html'">Voltar ao início</button>
@@ -104,7 +104,7 @@ function render(){
         <div>
           <h1>Registro de Inscrições</h1>
           <p class="subtitle">${list.length} de ${allSubs.length} formulário(s)${loadError?` · <span>${escapeHtml(loadError)}</span>`:""}</p>
-          <p class="subtitle">Logado como <strong>${escapeHtml(CURRENT_USER.nick||"Membro")}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
+          <p class="subtitle">Logado como <strong>${escapeHtml(CURRENT_USER.email)}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
           ${serverBadge}
         </div>
         <div class="btn-group registro-actions">

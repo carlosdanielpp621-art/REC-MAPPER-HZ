@@ -29,7 +29,7 @@ async function refreshAuth(){
   const {data:{session},error}=await sb.auth.getSession(); if(error) throw error;
   CURRENT_USER=session?.user ? {email:session.user.email,name:session.user.user_metadata?.full_name||"Membro"}:null;
   CURRENT_ROLE=null; CURRENT_SERVIDOR=null;
-  if(CURRENT_USER){ const identity=await rpc("mapper_current_identity"); CURRENT_ROLE=identity?.role||null; CURRENT_SERVIDOR=identity?.servidor||null; CURRENT_USER.nick=identity?.nick; }
+  if(CURRENT_USER){ const identity=await rpc("mapper_current_identity"); CURRENT_ROLE=identity?.role||null; CURRENT_SERVIDOR=identity?.servidor||null; CURRENT_USER.nick=identity?.nick||CURRENT_USER.email; }
   return {user:CURRENT_USER,role:CURRENT_ROLE,servidor:CURRENT_SERVIDOR};
 }
 async function rpc(name,args={}){ if(!sb) throw new Error("Sem conexão com Supabase"); const {data,error}=await sb.rpc(name,args); if(error) throw error; return data; }
@@ -78,7 +78,7 @@ function renderPanel({active="inicio"}={}){
   <header class="topbar">
     <div class="topbar-left">
       <button class="icon-btn" id="toggleSidebar" title="Recolher menu">${icon("menu")}</button>
-      <img class="brand-logo" src="/__l5e/assets-v1/331cc622-0b60-4087-a32d-2689c5ef7751/rec-mapper-logo.png" alt="REC Mapper" />
+      <img class="brand-logo" src="/assets/logo.svg.png" alt="REC Mapper" />
     </div>
     <div class="topbar-right">
       ${showNotif?`<div class="notification-wrap" id="notifWrap">

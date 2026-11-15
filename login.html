@@ -11,20 +11,20 @@
 <script src="/assets/app.js"></script>
 <div class="center-page">
   <div class="card login-card">
-    <div>
-      <img class="brand-logo" src="/__l5e/assets-v1/331cc622-0b60-4087-a32d-2689c5ef7751/rec-mapper-logo.png" alt="REC Mapper" />
+    <div style="display:flex;justify-content:center;margin-bottom:.75rem">
+      <img class="brand-logo" src="/assets/logo.svg.png" alt="REC Mapper" />
     </div>
     <h1>Acesso Administrativo</h1>
-    <p class="subtitle">
+    <p class="subtitle" style="text-align:center">
       Faça login com sua conta Google. Somente contas autorizadas como
-      <strong>Mappes</strong> com cargo cadastrado
+      <strong>Responsável Mappes</strong> ou <strong>Auxiliar Mappes</strong>
       poderão acessar o painel de Registro.
     </p>
-    <div class="btn-group">
+    <div class="btn-group" style="justify-content:center;margin-top:1.25rem">
       <button class="btn btn-primary" id="btnGoogle">Entrar com Google</button>
       <button class="btn btn-outline" id="btnBack">Voltar</button>
     </div>
-    <p id="statusMsg" class="subtitle"></p>
+    <p id="statusMsg" class="subtitle" style="text-align:center;margin-top:1rem"></p>
   </div>
 </div>
 <script>
@@ -49,7 +49,7 @@ document.getElementById("btnBack").onclick = goBackOrHome;
   await refreshAuth();
   if(CURRENT_USER){
     document.getElementById("statusMsg").innerHTML =
-      `Você já está logado como <strong>${escapeHtml(CURRENT_USER.nick||"Membro")}</strong>` +
+      `Você já está logado como <strong>${CURRENT_USER.email}</strong>` +
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
     // Após login, redireciona para a página de Registro (mappers)

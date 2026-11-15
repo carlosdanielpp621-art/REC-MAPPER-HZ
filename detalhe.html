@@ -62,14 +62,14 @@ function render(){
 
   document.getElementById("main-content").innerHTML=`
     <div class="card">
-      <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
         <div>
           <h1>Inscrição — ${escapeHtml(sub.nick)}</h1>
           <p class="subtitle">Enviado em ${fmtDate(sub.createdAt)}</p>
         </div>
         <span class="badge ${sub.status}">${labelStatus(sub.status)}</span>
       </div>
-      <div>
+      <div style="margin-top:1rem">
         ${rows.map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
       </div>
       <section class="history-section"><h2>Histórico de decisões</h2><div id="formHistory">Carregando...</div></section><div class="btn-group">
@@ -79,7 +79,7 @@ function render(){
         ${sub.status==="analysis"?`
           <button class="btn btn-success" id="btnApprove">${icon("check")} Aprovar</button>
           <button class="btn btn-danger"  id="btnReject">${icon("x")} Recusar</button>`:""}
-        ${canDelete?`<button class="btn btn-danger" id="btnDelete">${icon("trash")} Excluir formulário</button>`:""}
+        ${canDelete?`<button class="btn btn-danger" id="btnDelete" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c)">${icon("trash")} Excluir formulário</button>`:""}
         ${canManageMembers()&&["approved","rejected"].includes(sub.status)?`<button class="btn btn-outline" id="btnRevision">${icon("edit")} Revisão</button>`:""}<button class="btn btn-outline" id="btnManage">${icon("settings")} Gerenciamento</button>
       </div>
       <div id="managePanel" ${managePanelOpen?"":"hidden"}>

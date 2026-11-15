@@ -1,0 +1,14 @@
+REC MAPPER HZ — versão corrigida v3
+
+O Supabase conectado já recebeu as correções. Nenhuma conta ou inscrição foi apagada: foram conferidas 14 contas, 5 membros e 24 inscrições.
+
+Publique esta pasta na Vercel, preservando os nomes das páginas. O acesso continua sendo pela mesma conta Google. Em Supabase > Authentication > URL Configuration, autorize o endereço do seu site seguido de /registro.html.
+
+Discord: os links secretos foram removidos do navegador. A pasta api/public inclui a entrega segura para Vercel. Em Vercel > Project > Settings > Environment Variables, configure SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, MAPPER_DISCORD_NEW_URL, MAPPER_DISCORD_APPROVED_URL e MAPPER_DISCORD_REJECTED_URL com os valores do seu provedor. Nunca publique esses valores dentro dos arquivos. Em outra hospedagem, adapte a função de entrega ao servidor dessa hospedagem.
+
+Os links antigos de webhook estavam expostos no ZIP original. Troque-os no Discord e atualize os valores secretos antes de publicar. Nenhum segredo antigo está nesta versão.
+
+Verificado: páginas públicas em computador/celular, redirecionamento do registro para login, painel e edição em teste visual, sete testes automatizados e restrições de leitura direta no Supabase.
+Ainda não verificado: login Google real e operações usando contas existentes (este projeto usa Supabase externo, sem sessão de teste disponível), entrega real ao Discord e publicação em seu domínio.
+
+O Supabase apresenta 22 alertas anteriores a esta correção, incluindo proteção contra senhas vazadas desativada. A correção não adicionou alertas novos.

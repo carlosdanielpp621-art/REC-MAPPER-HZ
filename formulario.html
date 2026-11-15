@@ -47,7 +47,7 @@ function renderForm(){
       <p class="subtitle">${sub}</p>
       <span class="server-badge">● ${EDIT_ID?"Modo edição":"Inscrição oficial"}</span>
 
-      <p id="lockNotice" class="lock-notice" role="status"></p><form id="formMapper" novalidate>
+      <p id="lockNotice" class="lock-notice" role="status"></p><form id="formMapper" style="margin-top:1.5rem" novalidate>
         <div class="form-grid">
           ${!EDIT_ID||isSuperAdmin()?`<div class="field full"><label>E-mail *</label><input required type="email" name="email" value="${escapeHtml(val("email"))}" /></div>`:""}
 
