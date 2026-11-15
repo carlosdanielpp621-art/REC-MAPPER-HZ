@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Login — REC Mapper</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-</head>
+<meta property="og:title" content="Login — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Login."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Login."/></head>
 <body>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/assets/app.js"></script>
@@ -17,7 +17,7 @@
     <h1>Acesso Administrativo</h1>
     <p class="subtitle" style="text-align:center">
       Faça login com sua conta Google. Somente contas autorizadas como
-      <strong>Responsável Mapper(a)</strong> ou <strong>Auxiliar Mapper(a)</strong>
+      <strong>Mappes</strong>
       poderão acessar o painel de Registro.
     </p>
     <div class="btn-group" style="justify-content:center;margin-top:1.25rem">
@@ -49,7 +49,7 @@ document.getElementById("btnBack").onclick = goBackOrHome;
   await refreshAuth();
   if(CURRENT_USER){
     document.getElementById("statusMsg").innerHTML =
-      `Você já está logado como <strong>${CURRENT_USER.email}</strong>` +
+      `Você já está logado como <strong>${escapeHtml(CURRENT_NICK||CURRENT_USER.name)}</strong>` +
       (CURRENT_ROLE ? ` — ${roleLabel(CURRENT_ROLE)}` : " (sem cargo autorizado).");
     toast("Login efetuado com sucesso.","success",2500);
     // Após login, redireciona para a página de Registro (mappers)

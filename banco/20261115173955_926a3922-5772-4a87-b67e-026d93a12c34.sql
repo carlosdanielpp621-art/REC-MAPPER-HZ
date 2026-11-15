@@ -1,0 +1,28 @@
+DO $$ DECLARE original_forms bigint; original_roles bigint; failed boolean; fid bigint; receipt jsonb; before_role text; BEGIN SELECT count(*) INTO original_forms FROM public.formularios; SELECT count(*) INTO original_roles FROM public.mapper_roles;
+BEGIN
+PERFORM set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000001","email":"criarp21@gmail.com","role":"authenticated"}',true);
+IF public.mapper_role_of('criarp21@gmail.com') <> 'responsavel_geral' OR NOT public.mapper_can_grant('criarp21@gmail.com','aux_responsavel_geral',NULL) THEN RAISE EXCEPTION 'General role test failed'; END IF;
+IF public.mapper_can_grant('hzmapper520@gmail.com','auxiliar','Servidor 1') OR public.mapper_can_grant('adrianopereira1413@gmail.com','auxiliar','Servidor 1') OR NOT public.mapper_can_grant('adrianopereira1413@gmail.com','auxiliar','Servidor 3') THEN RAISE EXCEPTION 'Server hierarchy test failed'; END IF;
+failed:=false;BEGIN PERFORM public.mapper_save_member(NULL,'mapper-test@example.invalid','auxiliar','','123','Servidor 1');EXCEPTION WHEN OTHERS THEN failed:=true;END;IF NOT failed THEN RAISE EXCEPTION 'Mandatory nick validation failed';END IF;
+failed:=false;BEGIN PERFORM public.mapper_remove_member((SELECT member_id FROM public.mapper_roles WHERE email='criarp21@gmail.com'));EXCEPTION WHEN OTHERS THEN failed:=true;END;IF NOT failed THEN RAISE EXCEPTION 'Founder protection failed';END IF;
+receipt:=public.mapper_submit_with_receipt('{"email":"mapper-test@example.invalid","nick":"Mapper QA","rg":"QA-1739","servidor":"Servidor 1"}');fid:=(receipt->>'id')::bigint;
+IF fid IS NULL OR receipt->>'receipt' IS NULL THEN RAISE EXCEPTION 'Submission receipt missing';END IF;
+failed:=false;BEGIN PERFORM public.mapper_submit_with_receipt('{"email":"mapper-test@example.invalid","nick":"Mapper QA","rg":"QA-1739","servidor":"Servidor 1"}');EXCEPTION WHEN OTHERS THEN failed:=true;END;IF NOT failed THEN RAISE EXCEPTION '48 hour duplicate protection failed';END IF;
+PERFORM public.mapper_decide_form(fid,'analysis','',false);
+failed:=false;BEGIN PERFORM public.mapper_decide_form(fid,'approved',' ',false);EXCEPTION WHEN OTHERS THEN failed:=true;END;IF NOT failed THEN RAISE EXCEPTION 'Mandatory decision reason failed';END IF;
+PERFORM public.mapper_decide_form(fid,'rejected','Motivo teste recusa',false);PERFORM public.mapper_decide_form(fid,'approved','Motivo teste revisão',true);
+IF (SELECT status FROM public.formularios WHERE id=fid)<>'approved' OR NOT EXISTS(SELECT 1 FROM public.formulario_historico WHERE formulario_id=fid AND acao='revisao' AND status_anterior='rejected' AND status_novo='approved' AND motivo='Motivo teste revisão') THEN RAISE EXCEPTION 'Atomic revision audit failed';END IF;
+PERFORM set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000001","email":"hzmapper520@gmail.com","role":"authenticated"}',true);
+IF NOT public.mapper_access_server('Servidor 1') OR public.mapper_access_server('Servidor 2') THEN RAISE EXCEPTION 'Assistant scope failed';END IF;
+IF EXISTS(SELECT 1 FROM public.mapper_list_members() m WHERE m->>'email' IS NOT NULL) OR EXISTS(SELECT 1 FROM public.mapper_list_forms(fid) f WHERE f ? 'email') THEN RAISE EXCEPTION 'Email privacy failed';END IF;
+failed:=false;BEGIN PERFORM public.mapper_decide_form(fid,'rejected','Motivo teste',true);EXCEPTION WHEN OTHERS THEN failed:=true;END;IF NOT failed THEN RAISE EXCEPTION 'Assistant revision restriction failed';END IF;
+PERFORM set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000001","email":"criarp21@gmail.com","role":"authenticated"}',true);
+UPDATE public.formulario_config SET locked=true WHERE servidor='Servidor 2';
+failed:=false;BEGIN PERFORM public.mapper_submit_with_receipt('{"email":"mapper-lock-test@example.invalid","nick":"Mapper lock QA","rg":"QA-L","servidor":"Servidor 2"}');EXCEPTION WHEN OTHERS THEN failed:=true;END;IF NOT failed THEN RAISE EXCEPTION 'Per server lock failed';END IF;
+IF (SELECT locked FROM public.formulario_config WHERE servidor='Servidor 1') THEN RAISE EXCEPTION 'Unrelated server lock affected';END IF;
+RAISE EXCEPTION USING ERRCODE='Z0001',MESSAGE='test rollback';
+EXCEPTION WHEN SQLSTATE 'Z0001' THEN NULL;
+END;
+IF (SELECT count(*) FROM public.formularios)<>original_forms OR (SELECT count(*) FROM public.mapper_roles)<>original_roles THEN RAISE EXCEPTION 'Test data cleanup failed';END IF;
+RAISE NOTICE 'All database permission, submission, lock and revision tests passed; temporary changes rolled back.';
+END $$;

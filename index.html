@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>REC EQUIPE MAPPERS — Formulário Setor Mapper | Horizonte Roleplay</title>
 <meta name="description" content="Formulário oficial para inscrição no setor Mapper do Horizonte Roleplay." />
-<link rel="stylesheet" href="assets/styles.css" />
-</head>
+<link rel="stylesheet" href="/assets/styles.css" />
+<meta property="og:title" content="REC EQUIPE MAPPERS — Formulário Setor Mapper | Horizonte Roleplay"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. REC EQUIPE MAPPERS."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/></head>
 <body>
 <div id="panel-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/app.js"></script>
+<script src="/assets/app.js"></script>
 <script>
 async function renderInicio(){
   const locked = await isFormLocked();
   const btn = locked
     ? `<button class="btn btn-primary" disabled title="Formulário trancado" style="opacity:.5;cursor:not-allowed">🔒 Formulário Trancado</button>`
-    : `<button class="btn btn-primary" onclick="location.href='formulario'">Concordo</button>`;
+    : `<button class="btn btn-primary" onclick="location.href='/formulario.html'">Concordo</button>`;
   const lockNotice = locked
     ? `<div style="margin-top:1rem;padding:1rem;border-radius:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca">
          <strong>🔒 As inscrições estão temporariamente trancadas.</strong><br>
@@ -44,7 +44,7 @@ async function renderInicio(){
 
 let _inicioChan = null;
 function subscribeInicioRealtime(){
-  if(!window.sb || _inicioChan) return;
+  if(!sb || _inicioChan) return;
   _inicioChan = sb.channel("inicio-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"}, ()=> renderInicio())
     .on("postgres_changes",{event:"*",schema:"public",table:"formularios"}, ()=> renderInicio())
@@ -52,6 +52,7 @@ function subscribeInicioRealtime(){
       if(typeof loadNotifications === "function") loadNotifications();
     })
     .subscribe();
+  window.addEventListener("pagehide",()=>sb.removeChannel(_inicioChan),{once:true});
 }
 
 (async ()=>{

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Inscrição — REC Mapper</title>
 <link rel="stylesheet" href="/assets/styles.css" />
-</head>
+<meta property="og:title" content="Inscrição — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Inscrição."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Inscrição."/></head>
 <body>
 <div id="panel-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -14,6 +14,7 @@
 const id=new URLSearchParams(location.search).get("id");
 let sub=null;
 let managePanelOpen=false;
+let history=[];
 
 function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}
 
@@ -31,8 +32,8 @@ async function bootstrap(){
 
 async function load(){
   document.getElementById("main-content").innerHTML=`<div class="card"><p class="subtitle">Carregando...</p></div>`;
-  try{ sub = await loadSubFromSupabase(id); }
-  catch(e){ console.error(e); sub = loadSubs().find(x=>String(x.id)===String(id))||null; }
+  try{ sub = await loadSubFromSupabase(id);history=await rpc("mapper_form_history",{_id:Number(id)}); }
+  catch(e){ console.error(e); sub=null;toast("Não foi possível carregar a inscrição","error"); }
   render();
 }
 
@@ -69,7 +70,7 @@ function render(){
         <span class="badge ${sub.status}">${labelStatus(sub.status)}</span>
       </div>
       <div style="margin-top:1rem">
-        ${rows.map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
+        ${rows.filter(([k])=>isSuperAdmin()||!k.startsWith("E-mail")).map(([k,v])=>`<div class="detail-row"><div class="k">${k}</div><div class="v">${escapeHtml(v||"—")}</div></div>`).join("")}
       </div>
       <div class="btn-group">
         <button class="btn btn-outline" onclick="location.href='/registro.html'">${icon("arrow-left")} Voltar</button>
@@ -79,6 +80,7 @@ function render(){
           <button class="btn btn-success" id="btnApprove">${icon("check")} Aprovar</button>
           <button class="btn btn-danger"  id="btnReject">${icon("x")} Recusar</button>`:""}
         ${canDelete?`<button class="btn btn-danger" id="btnDelete" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c)">${icon("trash")} Excluir formulário</button>`:""}
+        ${canReview()&&["approved","rejected"].includes(sub.status)?`<button class="btn btn-outline" id="btnReview">${icon("edit")} Revisão</button>`:""}
         <button class="btn btn-outline" id="btnManage">${icon("settings")} Gerenciamento</button>
       </div>
       <div id="managePanel" style="display:${managePanelOpen?'block':'none'}">
@@ -91,13 +93,15 @@ function render(){
           </div>
         </div>
       </div>
+      <section class="history-section"><h2>Histórico de decisões</h2>${history.length?history.map(h=>`<article class="history-row"><strong>${h.acao==="revisao"?"Revisão":labelStatus(h.status_novo)} · ${labelStatus(h.status_anterior)} → ${labelStatus(h.status_novo)}</strong><p>${escapeHtml(h.motivo)}</p><span class="subtitle">${fmtDate(h.created_at)}${isSuperAdmin()&&h.ator?" · "+escapeHtml(h.ator):""}</span></article>`).join(""):"<p class='subtitle'>Nenhuma decisão registrada.</p>"}</section>
     </div>`;
 
+  const review=document.getElementById("btnReview");if(review)review.onclick=()=>openDecision(null,true);
   const a=document.getElementById("btnApprove"),r=document.getElementById("btnReject");
-  if(a)a.onclick=()=>decide("approved");
+  if(a)a.onclick=()=>openDecision("approved");
   const an=document.getElementById("btnAnalysis");
-  if(an)an.onclick=async()=>{ try{ await updateStatusSupabase(sub.id,"analysis"); }catch(e){ console.warn(e); } sub.status="analysis"; toast("Inscrição em análise","success"); render(); };
-  if(r)r.onclick=()=>decide("rejected");
+  if(an)an.onclick=async()=>{an.disabled=true;try{await updateStatusSupabase(sub.id,"analysis");await load();toast("Inscrição em análise");}catch(e){toast(e.message,"error");an.disabled=false;}};
+  if(r)r.onclick=()=>openDecision("rejected");
 
   const del=document.getElementById("btnDelete");
   if(del) del.onclick=deleteSub;
@@ -112,13 +116,11 @@ function render(){
   if(editBtn) editBtn.onclick=()=>location.href=`/formulario.html?edit=${sub.id}`;
 }
 
-async function decide(status){
-  try{ await updateStatusSupabase(sub.id,status); }catch(e){ console.warn(e); }
-  sub.status=status;
-  toast(status==="approved"?"Inscrição aprovada":"Inscrição recusada",status==="approved"?"success":"error");
-  try{ await sendDiscord(sub,status, CURRENT_USER?.email); }catch{}
-  try{ await createNotification({tipo:status,titulo:status==="approved"?"Inscrição aprovada":"Inscrição recusada",mensagem:`${sub.nick||"—"} (${sub.servidor||"—"})`,formulario_id:sub.id,ator:CURRENT_USER?.email}); }catch{}
-  render();
+function openDecision(status,revision=false){
+ const w=document.createElement("div");w.className="modal-backdrop";
+ const target=status|| (sub.status==="approved"?"rejected":"approved");
+ w.innerHTML=`<section class="modal-card" role="dialog" aria-modal="true" aria-label="${revision?"Revisão":"Decisão"}"><h2>${revision?"Revisão da inscrição":target==="approved"?"Aprovar inscrição":"Recusar inscrição"}</h2><form id="decisionForm">${revision?`<label for="reviewType">Selecione a revisão</label><select id="reviewType"><option value="approved" ${target==="approved"?"selected":""} ${sub.status==="approved"?"disabled":""}>Solicitar aprovação</option><option value="rejected" ${target==="rejected"?"selected":""} ${sub.status==="rejected"?"disabled":""}>Solicitar reprovação</option></select>`:""}<label for="decisionReason">Motivo</label><textarea id="decisionReason" required rows="4"></textarea><div class="btn-group"><button class="btn btn-primary" type="submit">Confirmar</button><button class="btn btn-outline" id="decisionCancel" type="button">Cancelar</button></div></form></section>`;
+ document.body.appendChild(w);w.querySelector("#decisionReason").focus();w.querySelector("#decisionCancel").onclick=()=>w.remove();w.addEventListener("keydown",e=>{if(e.key==="Escape")w.remove();});w.querySelector("#decisionForm").onsubmit=async e=>{e.preventDefault();const reason=w.querySelector("#decisionReason").value.trim();if(!reason){toast("Informe o motivo","error");return;}const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;const next=revision?w.querySelector("#reviewType").value:target;try{await updateStatusSupabase(sub.id,next,reason,revision);w.remove();await load();toast(revision?"Revisão concluída":"Decisão registrada");await sendDiscord(sub,next);}catch(err){toast(err.message,"error");btn.disabled=false;}};
 }
 
 async function deleteSub(){
@@ -153,7 +155,7 @@ async function copyForm(){
     ["Status",labelStatus(sub.status)],
   ];
   const text = `📋 FORMULÁRIO — ${sub.nick||"—"}\n` + "═".repeat(40) + "\n" +
-    rows.map(([k,v])=>`${k}: ${v||"—"}`).join("\n");
+    rows.filter(([k])=>isSuperAdmin()||k!=="E-mail").map(([k,v])=>`${k}: ${v||"—"}`).join("\n");
   try{
     await navigator.clipboard.writeText(text);
     toast("Formulário copiado para a área de transferência","success");

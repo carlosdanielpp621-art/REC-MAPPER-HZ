@@ -4,12 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>REC EQUIPE MAPPERS — Formulário Setor Mappers</title>
-<link rel="stylesheet" href="assets/styles.css" />
-</head>
+<link rel="stylesheet" href="/assets/styles.css" />
+<meta property="og:title" content="REC EQUIPE MAPPERS — Formulário Setor Mappers"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. REC EQUIPE MAPPERS."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. REC EQUIPE MAPPERS."/></head>
 <body>
 <div id="panel-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/app.js"></script>
+<script src="/assets/app.js"></script>
 <script>
 const EDIT_ID = new URLSearchParams(location.search).get("edit");
 let existingSub = null;
@@ -18,30 +18,11 @@ let existingSub = null;
   await refreshAuth();
   renderPanel({active:"inicio"});
 
-  // Bloqueio global (apenas para envio novo, não para edição por mapper)
-  if(!EDIT_ID){
-    const locked = await isFormLocked();
-    if(locked){
-      document.getElementById("main-content").innerHTML = `
-        <div class="card" style="text-align:center">
-          <h1>🔒 Formulário trancado</h1>
-          <p class="subtitle" style="font-size:1rem;line-height:1.5">
-            O formulário está trancado e não poderá ser enviado no momento.<br/>
-            Consulte a equipe diretamente no <strong>TICKET</strong>.
-          </p>
-          <div class="btn-group" style="justify-content:center">
-            <button class="btn btn-outline" onclick="location.href='/index.html'">Voltar ao início</button>
-          </div>
-        </div>`;
-      return;
-    }
-  }
-
   if(EDIT_ID){
-    if(!CURRENT_USER || !isMapper()){
+    if(!CURRENT_USER || !canManageMembers()){
       location.href="/login.html"; return;
     }
-    try{ existingSub = await loadSubFromSupabase(EDIT_ID); }catch(e){ console.warn(e); }
+    try{ existingSub = await loadSubFromSupabase(EDIT_ID);if(!existingSub)throw new Error("Inscrição não encontrada"); }catch(e){ toast(e.message,"error");return; }
   }
 
   renderForm();
@@ -49,28 +30,11 @@ let existingSub = null;
 })();
 
 function subscribeLockRealtime(){
-  if(!sb || EDIT_ID) return;
-  sb.channel("form-lock-live")
-    .on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"}, async ()=>{
-      const locked = await isFormLocked();
-      if(locked){
-        document.getElementById("main-content").innerHTML = `
-          <div class="card" style="text-align:center">
-            <h1>🔒 Formulário trancado</h1>
-            <p class="subtitle" style="font-size:1rem;line-height:1.5">
-              O formulário está trancado e não poderá ser enviado no momento.<br/>
-              Consulte a equipe diretamente no <strong>TICKET</strong>.
-            </p>
-            <div class="btn-group" style="justify-content:center">
-              <button class="btn btn-outline" onclick="location.href='/index.html'">Voltar ao início</button>
-            </div>
-          </div>`;
-      }else{
-        renderForm();
-      }
-    })
-    .subscribe();
+ if(!sb||EDIT_ID)return;
+ const c=sb.channel(`form-lock-${Math.random().toString(36).slice(2)}`).on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"},()=>updateSelectedLock()).subscribe();
+ window.addEventListener("pagehide",()=>sb.removeChannel(c),{once:true});
 }
+async function updateSelectedLock(){const f=document.getElementById("formMapper");if(!f||EDIT_ID)return;const sv=f.elements.servidor.value;const btn=f.querySelector('[type="submit"]');try{const locked=sv?await isFormLocked(sv):false;btn.disabled=locked;const notice=document.getElementById("serverLockNotice");notice.textContent=locked?`O formulário do ${sv} está trancado. Consulte a equipe no ticket.`:"";notice.hidden=!locked;}catch(e){btn.disabled=true;toast("Não foi possível conferir o trancamento. Tente novamente.","error");}}
 
 function val(name){ return existingSub && existingSub[name] != null ? String(existingSub[name]) : ""; }
 function isChecked(name,value){
@@ -163,6 +127,9 @@ function renderForm(){
     </div>
   `;
 
+  document.getElementById("formMapper").insertAdjacentHTML("afterbegin",'<p id="serverLockNotice" class="lock-notice" role="status" hidden></p>');
+  document.querySelector('[name="servidor"]').addEventListener("change",updateSelectedLock);
+  if(EDIT_ID&&!isSuperAdmin()){const email=document.querySelector('[name="email"]');email.required=false;email.closest(".field").hidden=true;}
   document.getElementById("formMapper").addEventListener("submit", async e=>{
     e.preventDefault();
     const f=e.target;
@@ -187,9 +154,9 @@ function renderForm(){
     data.ip = await getUserIp();
     data.navegador = getUserAgent();
     data.status = "pending";
-    const sub={id:uid(),createdAt:Date.now(),...data};
+    const sub={createdAt:Date.now(),...data};
     try{
-      const saved = await saveToSupabase(data);
+      const saved = await saveToSupabase(data);sub.id=saved.id;sub.receipt=saved.receipt;
       await createNotification({tipo:"new",titulo:"Nova inscrição",mensagem:`${data.nick||"—"} (${data.servidor||"—"}) enviou um formulário`,formulario_id:saved?.id||null,ator:data.email});
     }catch(err){
       console.error(err);
@@ -197,10 +164,10 @@ function renderForm(){
       btn.disabled=false;btn.innerHTML=`${icon("send")} Enviar`;
       return;
     }
-    const list=loadSubs();list.unshift(sub);saveSubs(list);
+
     await sendDiscord(sub,"new");
     toast("Formulário enviado com sucesso!","success",2200);
-    setTimeout(()=>{ location.href="sucesso.html"; }, 1400);
+    setTimeout(()=>{ location.href="/sucesso.html"; }, 1400);
 
   });
 }

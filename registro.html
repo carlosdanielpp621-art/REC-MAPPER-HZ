@@ -50,12 +50,6 @@
   }
   .entry .meta .sub{word-break:break-word}
   .entry-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1000}
-  .modal-card{background:var(--panel,#141821);color:#fff;border-radius:14px;padding:1.5rem;max-width:460px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-  .modal-card h2{margin:0 0 .5rem;font-size:1.15rem}
-  .modal-card input, .modal-card select{width:100%;padding:.7rem .9rem;border-radius:8px;border:1px solid #2a2f3a;background:#0d1017;color:#fff;margin-top:.4rem}
-  .row-two{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-  .stack{display:flex;flex-direction:column;gap:.6rem}
 
   /* Mobile: manter os 3 botões do topo lado a lado e ampliar o campo de e-mail */
   @media (max-width: 900px){
@@ -95,7 +89,7 @@
     .entry{ flex-direction:row !important; align-items:center !important; }
   }
 </style>
-</head>
+<meta property="og:title" content="Registro de Formulários — REC Mapper"/><meta property="og:description" content="REC Mapper — Horizonte Roleplay. Registro de Formulários."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="REC Mapper — Horizonte Roleplay. Registro de Formulários."/></head>
 <body>
 <div id="panel-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -116,7 +110,7 @@ async function bootstrap(){
     document.getElementById("main-content").innerHTML = `
       <div class="card">
         <h1>Acesso negado</h1>
-        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_USER.email)}</strong> não possui cargo autorizado.</p>
+        <p class="subtitle">A conta <strong>${escapeHtml(CURRENT_NICK||CURRENT_USER.name)}</strong> não possui cargo autorizado.</p>
         <div class="btn-group">
           <button class="btn btn-outline" onclick="signOut()">Sair</button>
           <button class="btn btn-primary" onclick="location.href='/index.html'">Voltar ao início</button>
@@ -134,7 +128,7 @@ async function bootstrap(){
 let _rtChan = null;
 function subscribeRealtime(){
   if(!sb || _rtChan) return;
-  _rtChan = sb.channel("registro-live")
+  _rtChan = sb.channel(`registro-${Math.random().toString(36).slice(2)}`)
     .on("postgres_changes",{event:"*",schema:"public",table:"formularios"}, ()=>{ fetchAll(); })
     .on("postgres_changes",{event:"*",schema:"public",table:"formulario_config"}, async ()=>{
       const locked = await isFormLocked();
@@ -145,12 +139,13 @@ function subscribeRealtime(){
       if(typeof loadNotifications === "function") loadNotifications();
     })
     .subscribe();
+  window.addEventListener("pagehide",()=>sb.removeChannel(_rtChan),{once:true});
 }
 
 async function fetchAll(){
   loading=true; render();
   try{ allSubs = await loadSubsFromSupabase(); loadError=""; }
-  catch(e){ console.error(e); loadError = e.message || "Falha ao carregar"; allSubs = loadSubs(); }
+  catch(e){ console.error(e); loadError = e.message || "Falha ao carregar"; allSubs = []; }
   loading=false; render();
 }
 
@@ -160,7 +155,7 @@ function render(){
     if(!SERVIDORES.includes(s.servidor)) return false;
     if(restrictedServer && s.servidor !== restrictedServer) return false;
     if(filterServer && s.servidor!==filterServer) return false;
-    if(searchEmail && !(s.email||"").toLowerCase().includes(searchEmail.toLowerCase())) return false;
+    if(searchEmail && ![s.nick,s.rg,isSuperAdmin()?s.email:null].filter(Boolean).some(v=>String(v).toLowerCase().includes(searchEmail.toLowerCase()))) return false;
     return true;
   });
   const items = loading
@@ -172,7 +167,7 @@ function render(){
           <span class="entry-num">${i+1}.</span>
           <div class="meta">
             <span class="name">${escapeHtml(s.nick||"—")} <span style="color:var(--muted);font-weight:400">· ${escapeHtml(s.servidor||"")}</span></span>
-            <span class="sub">${escapeHtml(s.email||"")}</span>
+            <span class="sub">${isSuperAdmin()?escapeHtml(s.email||""):"RG: "+escapeHtml(s.rg||"—")}</span>
             <span class="sub">${fmtDate(s.createdAt)}</span>
           </div>
         </div>
@@ -192,21 +187,21 @@ function render(){
         <div>
           <h1>Registro de Inscrições</h1>
           <p class="subtitle">${list.length} de ${allSubs.length} formulário(s)${loadError?` · <span style="color:var(--danger)">${escapeHtml(loadError)}</span>`:""}</p>
-          <p class="subtitle" style="margin-top:.2rem">Logado como <strong>${escapeHtml(CURRENT_USER.email)}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
+          <p class="subtitle" style="margin-top:.2rem">Logado como <strong>${escapeHtml(CURRENT_NICK||CURRENT_USER.name)}</strong> — ${roleLabel(CURRENT_ROLE)}</p>
           ${serverBadge}
         </div>
         <div class="btn-group registro-actions" style="margin:0;flex-wrap:wrap">
-          ${canManageMembers()?`<button class="btn btn-outline" id="btnLock" style="padding:.5rem .8rem;font-size:.85rem"><span id="btnLockIcon">${icon("lock",16)}</span> <span id="btnLockLabel">Trancar formulário</span></button>`:""}
+          ${canLockForms()?`<button class="btn btn-outline" id="btnLock" style="padding:.5rem .8rem;font-size:.85rem"><span id="btnLockIcon">${icon("lock",16)}</span> <span id="btnLockLabel">Trancar formulário</span></button>`:""}
 
           ${canManageMembers()?`<button class="btn btn-outline" id="btnLiberar" style="padding:.5rem .8rem;font-size:.85rem">${icon("unlock",16)} Liberar reenvio</button>`:""}
-          <button class="btn btn-primary" id="btnAnalista">${icon("plus")} Adicionar Analista</button>
+          <button class="btn btn-primary" id="btnAnalista">${icon("plus")} Equipe Mappes</button>
         </div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 240px;gap:.75rem;margin-top:1rem" class="filters">
         <div class="field" style="margin:0;padding:.85rem 1rem">
-          <label style="margin-bottom:.4rem;font-size:.9rem">🔎 Pesquisar por e-mail</label>
-          <input id="searchEmail" placeholder="digite o e-mail..." value="${escapeHtml(searchEmail)}" />
+          <label style="margin-bottom:.4rem;font-size:.9rem">Pesquisar por nick, RG${isSuperAdmin()?" ou e-mail":""}</label>
+          <input id="searchEmail" placeholder="Pesquisar..." value="${escapeHtml(searchEmail)}" />
         </div>
         <div class="field" style="margin:0;padding:.85rem 1rem">
           <label style="margin-bottom:.4rem;font-size:.9rem">Filtrar por servidor</label>
@@ -234,40 +229,19 @@ function render(){
       const locked = await isFormLocked();
       updateLockButton(locked);
     })();
-    lockBtn.onclick = async ()=>{
-      const currently = await isFormLocked();
-      const next = !currently;
-      const label = next ? "TRANCAR" : "DESTRANCAR";
-      if(!confirm(`${label} o formulário? ${next?"Usuários NÃO poderão enviar novos formulários.":"Usuários poderão enviar formulários normalmente."}`)) return;
-      try{
-        await setFormLocked(next);
-        updateLockButton(next);
-        toast(next?"Formulário trancado":"Formulário destrancado", next?"error":"success");
-      }catch(e){
-        toast(e.message||"Erro ao alterar status","error");
-      }
-    };
+    lockBtn.onclick = openLockModal;
   }
 }
 
-function updateLockButton(locked){
-  const btn = document.getElementById("btnLock");
-  const label = document.getElementById("btnLockLabel");
-  const ic = document.getElementById("btnLockIcon");
-  if(!btn || !label) return;
-  if(locked){
-    label.textContent = "Destrancar formulário";
-    if(ic) ic.innerHTML = icon("unlock",16);
-    btn.style.borderColor = "var(--success)";
-    btn.style.color = "var(--success)";
-  }else{
-    label.textContent = "Trancar formulário";
-    if(ic) ic.innerHTML = icon("lock",16);
-    btn.style.borderColor = "";
-    btn.style.color = "";
-  }
+function updateLockButton(){const label=document.getElementById("btnLockLabel");if(label)label.textContent="Trancar formulário";}
+async function openLockModal(){
+ const w=createModal("Trancamento por servidor",`<label for="lockServer">Servidor</label><select id="lockServer">${allowedServers().map(s=>`<option>${s}</option>`).join("")}</select><p id="lockState" class="subtitle"></p><div class="btn-group"><button id="lockConfirm" class="btn btn-primary">Confirmar</button><button id="lockCancel" class="btn btn-outline">Cancelar</button></div>`);
+ let locked=false;
+ async function refresh(){try{locked=await isFormLocked(w.querySelector("#lockServer").value);w.querySelector("#lockState").textContent=locked?"Trancado":"Aberto";w.querySelector("#lockConfirm").textContent=locked?"Destrancar":"Trancar";}catch(e){toast(e.message,"error");}}
+ w.querySelector("#lockServer").onchange=refresh;w.querySelector("#lockCancel").onclick=()=>w.remove();
+ w.querySelector("#lockConfirm").onclick=async e=>{e.target.disabled=true;try{await setFormLocked(!locked,w.querySelector("#lockServer").value);toast(!locked?"Formulário trancado":"Formulário destrancado");w.remove();}catch(err){toast(err.message,"error");e.target.disabled=false;}};await refresh();
 }
-
+function createModal(title,body){const w=document.createElement("div");w.className="modal-backdrop";w.innerHTML=`<section class="modal-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><h2>${title}</h2>${body}</section>`;document.body.appendChild(w);const previous=document.activeElement;const close=()=>{w.remove();previous?.focus();};w.addEventListener("click",e=>{if(e.target===w)close();});w.addEventListener("keydown",e=>{if(e.key==="Escape")close();if(e.key==="Tab"){const nodes=[...w.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)')];const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}});w.querySelector("input,select,textarea,button")?.focus();return w;}
 
 function openLiberarModal(){
   const wrap = document.createElement("div");
@@ -285,7 +259,7 @@ function openLiberarModal(){
           <label class="subtitle" style="display:block">Servidor</label>
           <select id="libServidor">
             <option value="" disabled selected>Selecione</option>
-            ${SERVIDORES.map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
+            ${allowedServers().map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
           </select>
         </div>
         <div>
@@ -320,131 +294,22 @@ function openLiberarModal(){
 }
 
 async function openAnalistaPanel(){
-  const canManage = canManageMembers();
-  const wrap = document.createElement("div");
-  wrap.className = "modal-backdrop";
-  wrap.innerHTML = `
-    <div class="modal-card" style="max-width:580px">
-      <h2>Painel Administrativo — Analistas</h2>
-      <p class="subtitle" style="margin:.2rem 0 .8rem">${canManage?"Gerencie os membros com cargo cadastrado.":"Você tem permissão apenas para visualizar."}</p>
-      <div id="membersList" style="max-height:340px;overflow:auto;border:1px solid #2a2f3a;border-radius:10px;padding:.5rem;background:#0d1017">
-        <p class="subtitle" style="margin:.5rem">Carregando...</p>
-      </div>
-      ${canManage?`
-      <div class="stack" style="margin-top:1rem">
-        <div class="row-two">
-          <button class="btn btn-primary" id="addRespBtn">${icon("plus")} Adicionar Responsável Mapper(a)</button>
-          <button class="btn btn-primary" id="addAuxBtn">${icon("plus")} Adicionar Auxiliar Mapper(a)</button>
-        </div>
-        ${isRootSuperAdmin()?`<button class="btn btn-primary" id="addSuperBtn" style="background:#facc15;color:#111">${icon("plus")} Adicionar Super Admin</button>`:""}
-        <button class="btn btn-outline" id="closePanelBtn">Cancelar</button>
-      </div>`:`
-      <div class="stack" style="margin-top:1rem">
-        <button class="btn btn-outline" id="closePanelBtn">Fechar</button>
-      </div>`}
-    </div>`;
-  document.body.appendChild(wrap);
-  const close = ()=>wrap.remove();
-  wrap.querySelector("#closePanelBtn").onclick = close;
-  wrap.addEventListener("click", e=>{ if(e.target===wrap) close(); });
-  if(canManage){
-    wrap.querySelector("#addRespBtn").onclick = ()=>openAddModal("responsavel", ()=>loadMembers(wrap));
-    wrap.querySelector("#addAuxBtn").onclick  = ()=>openAddModal("auxiliar",   ()=>loadMembers(wrap));
-    const sb2 = wrap.querySelector("#addSuperBtn");
-    if(sb2) sb2.onclick = ()=>openAddModal("super_admin", ()=>loadMembers(wrap));
-  }
-  await loadMembers(wrap);
+ const w=createModal("Equipe Mappes",`<div id="membersList" class="members-list"></div><div class="btn-group">${canManageMembers()?'<button class="btn btn-primary" id="addMember">Adicionar membro</button>':""}<button class="btn btn-outline" id="closePanelBtn">Fechar</button></div>`);
+ w.querySelector(".modal-card").classList.add("team-modal");w.querySelector("#closePanelBtn").onclick=()=>w.remove();const add=w.querySelector("#addMember");if(add)add.onclick=()=>openAddModal(null,()=>loadMembers(w));await loadMembers(w);
 }
-
-async function loadMembers(wrap){
-  const box = wrap.querySelector("#membersList");
-  const canManage = canManageMembers();
-  box.innerHTML = `<p class="subtitle" style="margin:.5rem">Carregando...</p>`;
-  try{
-    const { data, error } = await sb.from("mapper_roles")
-      .select("email,role,servidor,created_at")
-      .order("role",{ascending:true}).order("created_at",{ascending:true});
-    if(error) throw error;
-    if(!data || !data.length){
-      box.innerHTML = `<p class="subtitle" style="margin:.5rem">Nenhum membro cadastrado.</p>`;
-      return;
-    }
-    box.innerHTML = data.map((m,i)=>{
-      const isRoot = (m.email||"").toLowerCase() === "criarp21@gmail.com";
-      const isSuperRow = isRoot || m.role === "super_admin";
-      // Só o root (criarp21) é intocável; super admins adicionados só podem ser removidos pelo root
-      const canRemove = canManage && !isRoot && !(m.role === "super_admin" && !isRootSuperAdmin());
-      const servidorTxt = m.servidor ? m.servidor : "Todos os servidores";
-      return `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.55rem .65rem;border-bottom:1px solid #1e222c">
-        <div style="min-width:0">
-          <div style="font-weight:600">${i+1}. ${escapeHtml(roleLabel(m.role))}${isSuperRow?' <span style="color:#facc15;font-size:.75rem">★ Super Admin</span>':''}</div>
-          <div class="subtitle" style="margin:0;font-size:.85rem;word-break:break-all">${escapeHtml(m.email)} · <span style="color:#93c5fd">${escapeHtml(servidorTxt)}</span></div>
-        </div>
-        ${canRemove
-          ? `<button class="btn btn-outline" data-email="${escapeHtml(m.email)}" style="padding:.35rem .7rem">Remover</button>`
-          : (isRoot ? `<span class="subtitle" style="font-size:.75rem">Protegido</span>` : "")}
-      </div>`;
-    }).join("");
-    box.querySelectorAll("button[data-email]").forEach(b=>{
-      b.onclick = async ()=>{
-        const email = b.getAttribute("data-email");
-        if(!confirm(`Remover ${email}?`)) return;
-        const { error } = await sb.from("mapper_roles").delete().eq("email", email);
-        if(error){ toast(error.message || "Erro ao remover","error"); return; }
-        toast(`${email} removido`,"success");
-        await loadMembers(wrap);
-      };
-    });
-  }catch(e){
-    box.innerHTML = `<p class="subtitle" style="margin:.5rem;color:var(--danger)">${escapeHtml(e.message||"Erro ao carregar")}</p>`;
-  }
+async function loadMembers(w){
+ const box=w.querySelector("#membersList");box.textContent="Carregando...";
+ try{const members=await rpc("mapper_list_members");box.innerHTML=members.map(m=>`<article class="member-row"><div class="member-info"><strong>${escapeHtml(m.nick||"Nick não informado")}</strong><span class="subtitle">RG: ${escapeHtml(m.rg||"Não informado")} · ${escapeHtml(m.servidor||"Todos os servidores")}</span><span class="subtitle">${roleLabel(m.role)}</span>${isSuperAdmin()?`<span class="subtitle">${escapeHtml(m.email)}</span>`:""}</div><div class="member-actions">${canManageTarget(m)?`<button class="icon-btn" data-edit="${m.member_id}" title="Editar membro" aria-label="Editar ${escapeHtml(m.nick||"membro")}">${icon("edit",16)}</button><button class="icon-btn" data-remove="${m.member_id}" title="Remover membro" aria-label="Remover ${escapeHtml(m.nick||"membro")}">${icon("trash",16)}</button>`:m.protected?'<span class="subtitle">Protegido</span>':""}</div></article>`).join("");
+ box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openAddModal(members.find(m=>m.member_id===b.dataset.edit),()=>loadMembers(w)));
+ box.querySelectorAll("[data-remove]").forEach(b=>b.onclick=async()=>{const m=members.find(m=>m.member_id===b.dataset.remove);if(!confirm(`Remover ${m.nick||"este membro"}?`))return;try{await rpc("mapper_remove_member",{_member_id:m.member_id});await loadMembers(w);toast("Membro removido");}catch(e){toast(e.message,"error");}});
+ }catch(e){box.textContent=e.message;}
 }
-
-function openAddModal(role, onDone){
-  const label = roleLabel(role);
-  const showAll = isSuperAdmin();
-  const wrap = document.createElement("div");
-  wrap.className = "modal-backdrop";
-  wrap.style.zIndex = 1100;
-  const isSuperRole = role === "super_admin";
-  wrap.innerHTML = `
-    <div class="modal-card">
-      <h2>Adicionar ${label}</h2>
-      <p class="subtitle" style="margin:0 0 .5rem">Digite o e-mail do Google${isSuperRole?" (Super Admin verá todos os servidores).":" e selecione o servidor."}</p>
-      <label class="subtitle" style="margin-top:.6rem;display:block">E-mail</label>
-      <input id="newEmail" type="email" placeholder="exemplo@gmail.com" />
-      ${isSuperRole?`<input type="hidden" id="newServidor" value="__all__" />`:`
-      <label class="subtitle" style="margin-top:.8rem;display:block">Selecione o servidor</label>
-      <select id="newServidor">
-        <option value="" disabled selected>Selecione o servidor</option>
-        ${SERVIDORES.map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
-        ${showAll?`<option value="__all__">Todos os servidores</option>`:""}
-      </select>`}
-      <div class="stack" style="margin-top:1rem">
-        <button class="btn btn-primary" id="confirmBtn">Confirmar</button>
-        <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
-      </div>
-    </div>`;
-  document.body.appendChild(wrap);
-  const close = ()=>wrap.remove();
-  wrap.querySelector("#cancelBtn").onclick = close;
-  wrap.addEventListener("click", e=>{ if(e.target===wrap) close(); });
-  wrap.querySelector("#confirmBtn").onclick = async ()=>{
-    const email = wrap.querySelector("#newEmail").value;
-    const sv = wrap.querySelector("#newServidor").value;
-    if(!sv){ toast("Selecione o servidor","error"); return; }
-    const servidor = sv === "__all__" ? null : sv;
-    try{
-      const saved = await addMapperRole(email, role, servidor);
-      toast(`${saved} cadastrado como ${label} (${servidor||"Todos os servidores"})`, "success");
-      close();
-      if(typeof onDone === "function") await onDone();
-    }catch(e){
-      toast(e.message || "Erro ao salvar", "error");
-    }
-  };
-  setTimeout(()=>wrap.querySelector("#newEmail").focus(), 50);
+function openAddModal(member,onDone){
+ const roles=allowedRoles();if(!roles.length)return;
+ const w=createModal(member?"Editar membro":"Adicionar membro",`<form id="memberForm"><label for="newEmail">E-mail</label><input id="newEmail" type="email" ${member&&!isSuperAdmin()?"hidden":"required"} value="${escapeHtml(member?.email||"")}"/><label for="newRole">Cargo</label><select id="newRole">${roles.map(r=>`<option value="${r}" ${r===member?.role?"selected":""}>${roleLabel(r)}</option>`).join("")}</select><label for="newNick">Nick</label><input id="newNick" required value="${escapeHtml(member?.nick||"")}"/><label for="newRg">RG</label><input id="newRg" required value="${escapeHtml(member?.rg||"")}"/><label for="newServidor">Servidor</label><select id="newServidor">${allowedServers().map(s=>`<option ${s===member?.servidor?"selected":""}>${s}</option>`).join("")}<option value="">Todos os servidores</option></select><div class="btn-group"><button type="submit" class="btn btn-primary">Salvar</button><button type="button" id="memberCancel" class="btn btn-outline">Cancelar</button></div></form>`);
+ w.classList.add("modal-front");if(member&&!isSuperAdmin())w.querySelector('label[for="newEmail"]').hidden=true;
+ function sync(){const general=["responsavel_geral","aux_responsavel_geral"].includes(w.querySelector("#newRole").value);const sv=w.querySelector("#newServidor");sv.querySelector('option[value=""]').hidden=!general;sv.disabled=general;if(general)sv.value="";else if(!sv.value)sv.value=allowedServers()[0];}w.querySelector("#newRole").onchange=sync;sync();
+ w.querySelector("#memberCancel").onclick=()=>w.remove();w.querySelector("#memberForm").onsubmit=async e=>{e.preventDefault();const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;try{await addMapperRole(w.querySelector("#newEmail").value,w.querySelector("#newRole").value,w.querySelector("#newServidor").value||null,w.querySelector("#newNick").value,w.querySelector("#newRg").value,member?.member_id||null);toast("Membro salvo");w.remove();await onDone();}catch(err){toast(err.message,"error");btn.disabled=false;}};
 }
 
 function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}

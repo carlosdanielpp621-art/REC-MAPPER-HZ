@@ -2,11 +2,7 @@
    REC MAPPER — Client logic (com Google Auth + cargos)
    ============================================================ */
 
-const DISCORD_WEBHOOKS = {
-  new:      "https://discord.com/api/webhooks/1522773177304875130/cXlRmT8l5FdeeTehmcWbaqq7nSNER0MC_kLkk4RU6FlLMGn8kQH4SnthBVCGXywhrZ_n",
-  approved: "https://discord.com/api/webhooks/1522796036102291466/WwnCI2BIHxW2LUhJKId92eWsMrlC7V5ZZHP4wl9OUvp-Wl8dL_A_WLkPA9C8BYCRKNeh",
-  rejected: "https://discord.com/api/webhooks/1522797339675201599/rdZNrZlY0QSsYreOwthHn0zUGhbOeYx7ZL7V6dAu-v-SEJiCunnOtqeW3t8VAHc_5WlQ",
-};
+
 const STORAGE_KEY = "recmapper.submissions";
 
 /* ---------- Supabase ---------- */
@@ -18,14 +14,15 @@ const sb = (typeof window !== "undefined" && window.supabase)
 
 /* ---------- Utils ---------- */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
-function loadSubs(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{return []}}
-function saveSubs(list){localStorage.setItem(STORAGE_KEY,JSON.stringify(list))}
+function loadSubs(){return []}
+function saveSubs(list){}
 function fmtDate(ts){return new Date(ts).toLocaleString("pt-BR")}
 
 /* ---------- Auth + cargos ---------- */
 let CURRENT_USER = null;      // { email, name }
 let CURRENT_ROLE = null;      // 'responsavel' | 'auxiliar' | 'super_admin' | null
-let CURRENT_SERVIDOR = null;  // 'Servidor X' | null (todos)
+let CURRENT_SERVIDOR = null;
+let CURRENT_NICK = null;  // 'Servidor X' | null (todos)
 const SUPER_ADMIN_EMAIL = "criarp21@gmail.com";
 
 async function refreshAuth(){
@@ -39,8 +36,9 @@ async function refreshAuth(){
   CURRENT_SERVIDOR = null;
   if(CURRENT_USER){
     try{
-      const { data } = await sb.from("mapper_roles")
-        .select("role,servidor").eq("email", CURRENT_USER.email).maybeSingle();
+      const { data, error } = await sb.rpc("mapper_current_identity");
+      if(error) throw error;
+      CURRENT_NICK = data?.nick || null;
       CURRENT_ROLE = data?.role || null;
       CURRENT_SERVIDOR = data?.servidor || null;
     }catch(e){ console.warn(e); }
@@ -48,14 +46,16 @@ async function refreshAuth(){
   return { user: CURRENT_USER, role: CURRENT_ROLE, servidor: CURRENT_SERVIDOR };
 }
 
-function isMapper(){ return CURRENT_ROLE === "responsavel" || CURRENT_ROLE === "auxiliar" || CURRENT_ROLE === "super_admin" || isSuperAdmin(); }
-function isSuperAdmin(){
-  return (CURRENT_USER?.email||"").toLowerCase() === SUPER_ADMIN_EMAIL
-      || CURRENT_ROLE === "super_admin";
-}
-function isRootSuperAdmin(){ return (CURRENT_USER?.email||"").toLowerCase() === SUPER_ADMIN_EMAIL; }
+function isMapper(){ return ["responsavel_geral","aux_responsavel_geral","responsavel","auxiliar"].includes(CURRENT_ROLE); }
+function isSuperAdmin(){ return ["responsavel_geral","aux_responsavel_geral"].includes(CURRENT_ROLE); }
+function isRootSuperAdmin(){ return CURRENT_ROLE === "responsavel_geral"; }
 function canManageMembers(){ return isSuperAdmin() || CURRENT_ROLE === "responsavel"; }
-
+function canLockForms(){ return isMapper(); }
+function canReview(){ return canManageMembers(); }
+function allowedServers(){ return isSuperAdmin() ? ["Servidor 1","Servidor 2","Servidor 3"] : [CURRENT_SERVIDOR].filter(Boolean); }
+function allowedRoles(){ return CURRENT_ROLE === "responsavel_geral" ? ["responsavel_geral","aux_responsavel_geral","responsavel","auxiliar"] : CURRENT_ROLE === "aux_responsavel_geral" ? ["responsavel","auxiliar"] : CURRENT_ROLE === "responsavel" ? ["auxiliar"] : []; }
+function canManageTarget(m){ return !m.protected && !m.self && allowedRoles().includes(m.role) && (isSuperAdmin() || m.servidor === CURRENT_SERVIDOR); }
+async function rpc(name,args={}){ const {data,error}=await sb.rpc(name,args); if(error) throw error; return data; }
 async function signInGoogle(){
   if(!sb) return;
   await sb.auth.signInWithOAuth({
@@ -113,7 +113,7 @@ function renderPanel({active="inicio"}={}){
           </div>
         </div>
       </div>`:""}
-      <div class="avatar" title="${user?escapeHtml(user.email):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
+      <div class="avatar" title="${user?escapeHtml(CURRENT_NICK||user.name):'Perfil'}">${icon("user",18)}<span class="status-dot"></span></div>
       ${user
         ? `<button class="icon-btn" id="logoutBtn" title="Sair">${icon("log-out")}</button>`
         : `<button class="icon-btn" id="loginBtn" title="Entrar" onclick="location.href='/login.html'">${icon("log-in")}</button>`}
@@ -200,12 +200,7 @@ function renderPanel({active="inicio"}={}){
   }
 }
 
-function roleLabel(r){
-  return r==="responsavel" ? "Responsável Mapper(a)"
-       : r==="auxiliar"    ? "Auxiliar Mapper(a)"
-       : r==="super_admin" ? "Super Admin"
-       : "";
-}
+function roleLabel(r){return {responsavel_geral:"Responsável Geral Mappes",aux_responsavel_geral:"Auxiliar Responsável Geral Mappes",responsavel:"Responsável Mappes",auxiliar:"Auxiliar Mappes"}[r]||"Sem cargo";}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
 /* ---------- Ícones ---------- */
@@ -286,26 +281,11 @@ function buildDiscordFields(sub, responsavelEmail){
   });
   return fields;
 }
-async function sendDiscord(sub,action,responsavelEmail){
-  const colors={new:0x22d3ee,approved:0x22c55e,rejected:0xef4444};
-  const titles={new:"📥 Nova inscrição — Setor Mapper",approved:"✅ Inscrição APROVADA",rejected:"❌ Inscrição RECUSADA"};
-  const fields=buildDiscordFields(sub, responsavelEmail);
-  const embeds=[];
-  for(let i=0;i<fields.length;i+=25){
-    embeds.push({
-      title:titles[action]||"Formulário",
-      color:colors[action]||0x22d3ee,
-      timestamp:new Date().toISOString(),
-      fields:fields.slice(i,i+25),
-      footer:{text: responsavelEmail ? `Responsável: ${responsavelEmail}` : `ID: ${sub.email || sub.id || "—"}`}
-    });
-  }
-  const url = DISCORD_WEBHOOKS[action] || DISCORD_WEBHOOKS.new;
-  try{
-    await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({embeds})});
-  }catch(e){console.warn("Discord webhook falhou",e)}
+async function sendDiscord(sub,action){
+  const session=(await sb.auth.getSession()).data.session;
+  const response=await fetch("/api/public/mapper-delivery",{method:"POST",headers:{"Content-Type":"application/json",...(session?{Authorization:`Bearer ${session.access_token}`}:{})},body:JSON.stringify({id:sub.id,receipt:sub.receipt||null,action})});
+  if(!response.ok){toast("Formulário salvo; aviso ao Discord pendente.","error");return false;} return true;
 }
-
 /* ---------- Supabase (formulários) ---------- */
 function mapToRow(d){
   const yes = v => String(v||"").toLowerCase().startsWith("s");
@@ -360,106 +340,15 @@ function getUserAgent(){
 /* ---------- Bloqueio 48h + liberação ---------- */
 const REENVIO_MS = 48 * 60 * 60 * 1000; // 48 horas
 
-async function findDuplicateRecent(d){
-  if(!sb) return null;
-  const since = new Date(Date.now() - REENVIO_MS).toISOString();
-  const email = (d.email||"").toLowerCase();
-  const { data, error } = await sb.from("formularios")
-    .select("id,data_hora,email,nick,servidor,rg")
-    .ilike("email", email)
-    .ilike("nick", d.nick||"")
-    .eq("servidor", d.servidor||"")
-    .ilike("rg", d.rg||"")
-    .gte("data_hora", since)
-    .order("data_hora",{ascending:false})
-    .limit(1);
-  if(error){ console.warn("dup check falhou",error); return null; }
-  return (data && data[0]) || null;
-}
-
-async function findLiberacao(d){
-  if(!sb) return null;
-  const email = (d.email||"").toLowerCase();
-  const { data, error } = await sb.from("formulario_liberacoes")
-    .select("id,email,nick,servidor,rg,used_at,created_at")
-    .ilike("email", email)
-    .ilike("nick", d.nick||"")
-    .eq("servidor", d.servidor||"")
-    .ilike("rg", d.rg||"")
-    .is("used_at", null)
-    .order("created_at",{ascending:false})
-    .limit(1);
-  if(error){ console.warn("liberacao check falhou",error); return null; }
-  return (data && data[0]) || null;
-}
-
-async function consumeLiberacao(id){
-  if(!sb || !id) return;
-  await sb.from("formulario_liberacoes").update({used_at: new Date().toISOString()}).eq("id", id);
-}
-
-async function createLiberacao({email,nick,servidor,rg}){
-  if(!sb) throw new Error("Supabase indisponível");
-  const clean = String(email||"").trim().toLowerCase();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error("E-mail inválido");
-  if(!nick || !servidor || !rg) throw new Error("Preencha nick, servidor e RG");
-  const { error } = await sb.from("formulario_liberacoes")
-    .insert({ email: clean, nick: String(nick).trim(), servidor: String(servidor).trim(), rg: String(rg).trim() });
-  if(error) throw error;
-  return clean;
-}
+async function createLiberacao({email,nick,servidor,rg}){ await rpc("mapper_create_release",{_email:email,_nick:nick,_servidor:servidor,_rg:rg});return email; }
 
 async function saveToSupabase(data){
-  if(!sb){ throw new Error("Supabase client não carregado"); }
-
-  // 1) Verifica duplicidade recente (48h)
-  const dup = await findDuplicateRecent(data);
-  if(dup){
-    // 2) Se houver, procura liberação disponível
-    const lib = await findLiberacao(data);
-    if(!lib){
-      const restante = REENVIO_MS - (Date.now() - new Date(dup.data_hora).getTime());
-      const horas = Math.max(1, Math.ceil(restante/3600000));
-      throw new Error(`ERRO: Você foi bloqueado por enviar um formulário com as mesmas informações. Aguarde 48 horas antes de realizar um novo envio. Caso identifique algum problema, abra um ticket para suporte.`);
-    }
-    // consome a liberação e prossegue
-    await consumeLiberacao(lib.id);
-  }
-
-  let row = mapToRow(data);
-  let { data: inserted, error } = await tryInsertRow(row);
-  if(error && isMissingColumnError(error)){
-    const altRow = buildAlternativeRow(row);
-    if(JSON.stringify(altRow) !== JSON.stringify(row)){
-      const retry = await tryInsertRow(altRow);
-      if(!retry.error) return retry.data;
-      error = retry.error;
-    }
-  }
-  if(error){
-    if(isMissingColumnError(error)){
-      throw new Error("Falha ao salvar: colunas ausentes. Execute o SQL de preparação no Supabase.");
-    }
-    throw error;
-  }
-  return inserted;
+  if(await isFormLocked(data.servidor)) throw new Error("Formulário trancado para este servidor");
+  return await rpc("mapper_submit_with_receipt",{_data:mapToRow(data)});
 }
-
-async function loadSubsFromSupabase(){
-  if(!sb) throw new Error("Supabase client não carregado");
-  const { data, error } = await sb.from("formularios").select("*").order("data_hora",{ascending:false});
-  if(error) throw error;
-  return (data||[]).map(rowToSub);
-}
-async function loadSubFromSupabase(id){
-  const { data, error } = await sb.from("formularios").select("*").eq("id",id).maybeSingle();
-  if(error) throw error;
-  return data ? rowToSub(data) : null;
-}
-async function updateStatusSupabase(id,status){
-  const { error } = await sb.from("formularios").update({status}).eq("id",id);
-  if(error) throw error;
-}
+async function loadSubsFromSupabase(){ return (await rpc("mapper_list_forms",{_id:null})||[]).map(rowToSub); }
+async function loadSubFromSupabase(id){const rows=await rpc("mapper_list_forms",{_id:Number(id)});return rows?.[0]?rowToSub(rows[0]):null;}
+async function updateStatusSupabase(id,status,motivo="",revision=false){return await rpc("mapper_decide_form",{_id:Number(id),_status:status,_motivo:motivo,_revision:revision});}
 function rowToSub(r){
   return {
     id: r.id,
@@ -480,46 +369,17 @@ function rowToSub(r){
 }
 
 /* ---------- Cargos (mapper_roles) ---------- */
-async function addMapperRole(email, role, servidor){
-  if(!sb) throw new Error("Supabase não disponível");
-  const clean = String(email||"").trim().toLowerCase();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error("E-mail inválido");
-  const payload = { email: clean, role, servidor: servidor || null };
-  const { error } = await sb.from("mapper_roles").upsert(payload, { onConflict: "email" });
-  if(error) throw error;
-  return clean;
+async function addMapperRole(email,role,servidor,nick,rg,member_id=null){await rpc("mapper_save_member",{_member_id:member_id,_email:email,_role:role,_servidor:servidor,_nick:nick,_rg:rg});return email;}
+async function isFormLocked(servidor){
+  let query=sb.from("formulario_config").select("locked,servidor");
+  if(servidor)query=query.eq("servidor",servidor);
+  const {data,error}=await query;if(error)throw error;
+  return servidor ? !!data?.[0]?.locked : data?.length===3 && data.every(r=>r.locked);
 }
-
-/* Bootstrap: recarrega auth quando muda estado */
-if(sb){
-  sb.auth.onAuthStateChange(()=>{ /* páginas fazem seu próprio refresh */ });
-}
-
-/* ---------- Config: trancar formulário ---------- */
-async function isFormLocked(){
-  if(!sb) return false;
-  try{
-    const { data } = await sb.from("formulario_config").select("locked").eq("id",1).maybeSingle();
-    return !!(data && data.locked);
-  }catch(e){ console.warn("isFormLocked",e); return false; }
-}
-async function setFormLocked(locked){
-  if(!sb) throw new Error("Supabase não disponível");
-  const payload = { locked: !!locked, locked_by: CURRENT_USER?.email||null, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-  // A linha id=1 já existe no banco; usar UPDATE evita exigir política de INSERT.
-  let { data, error } = await sb.from("formulario_config").update(payload).eq("id",1).select();
-  if(error) throw error;
-  if(!data || data.length === 0){
-    // Fallback: se por algum motivo a linha não existir, cria via upsert.
-    const up = await sb.from("formulario_config").upsert({ id:1, ...payload }, { onConflict:"id" });
-    if(up.error) throw up.error;
-  }
-  await createNotification({
-    tipo: locked?"locked":"unlocked",
-    titulo: locked?"Formulário trancado":"Formulário destrancado",
-    mensagem: `${CURRENT_USER?.email||"—"} ${locked?"trancou":"destrancou"} o envio de novos formulários`,
-    ator: CURRENT_USER?.email||null
-  });
+async function setFormLocked(locked,servidor){
+  if(!allowedServers().includes(servidor))throw new Error("Servidor fora da sua permissão");
+  const {data,error}=await sb.from("formulario_config").update({locked,locked_by:CURRENT_USER.email,locked_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("servidor",servidor).select("servidor,locked");
+  if(error)throw error;if(data?.length!==1)throw new Error("Não foi possível alterar este servidor");
 }
 
 /* ---------- Notificações ---------- */
@@ -591,30 +451,8 @@ function notifIcon(tipo){
 }
 
 /* ---------- Delete + Update formulário ---------- */
-async function deleteFormularioSupabase(id){
-  if(!sb) throw new Error("Supabase não disponível");
-  const { error } = await sb.from("formularios").delete().eq("id",id);
-  if(error) throw error;
-}
-async function updateFormularioSupabase(id, data){
-  if(!sb) throw new Error("Supabase não disponível");
-  const yes = v => String(v||"").toLowerCase().startsWith("s");
-  const row = {
-    email: data.email||null, servidor: data.servidor||null, nick: data.nick||null,
-    rg: data.rg||null, discord: data.discord||null, "número": data.numero||null,
-    idade: data.idade||null, level: data.level||null,
-    org_corp: normalizeOrgCorp(data.orgCorp), plataforma: data.plataforma||null,
-    tipo_rp: data.rp||null,
-    experiencia_mapeacao: yes(data.expMap), experiencia_administracao: yes(data.expAdm),
-    motivo_mapper: data.motivo||null, nivel_mapeamento: data.nivel||null,
-    tempo_cidade: data.tempoCidade||null, caracteristicas_mapper: data.caracteristicas||null,
-    responsabilidade_propriedades: data.responsabilidade||null,
-    resolucao_erros_mapeamento: data.erro||null,
-  };
-  const { error } = await sb.from("formularios").update(row).eq("id",id);
-  if(error) throw error;
-}
-
+async function deleteFormularioSupabase(id){await rpc("mapper_delete_form",{_id:Number(id)});}
+async function updateFormularioSupabase(id,data){const row=mapToRow(data);if(!isSuperAdmin())delete row.email;await rpc("mapper_edit_form",{_id:Number(id),_data:row});}
 /* ---------- Icon extras ---------- */
 (function addExtraIcons(){
   const orig = icon;
