@@ -493,3 +493,5 @@ a{color:var(--primary);text-decoration:none}
   .icon-btn{ width:36px; height:36px; }
   .avatar{ display:none; }
 }
+
+.badge.analysis{background:rgba(234,179,8,.15);color:#facc15;border:1px solid rgba(234,179,8,.35)}

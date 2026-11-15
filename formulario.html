@@ -94,7 +94,7 @@ function renderForm(){
           <div class="field"><label>Selecione o servidor *</label>
             <select required name="servidor">
               <option value="">Servidor</option>
-              ${["Servidor 1","Servidor 2","Servidor 3","Servidor 4","Servidor 5"].map(sv=>`<option ${val('servidor')===sv?'selected':''}>${sv}</option>`).join("")}
+              ${["Servidor 1","Servidor 2","Servidor 3"].map(sv=>`<option ${val('servidor')===sv?'selected':''}>${sv}</option>`).join("")}
             </select>
           </div>
           <div class="field"><label>Nick *</label><input required name="nick" value="${escapeHtml(val('nick'))}" /></div>

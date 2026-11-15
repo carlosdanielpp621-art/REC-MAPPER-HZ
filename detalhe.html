@@ -15,7 +15,7 @@ const id=new URLSearchParams(location.search).get("id");
 let sub=null;
 let managePanelOpen=false;
 
-function labelStatus(s){return {pending:"Pendente",approved:"Aprovado",rejected:"Recusado"}[s]||s}
+function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}
 
 async function bootstrap(){
   await refreshAuth();
@@ -74,6 +74,8 @@ function render(){
       <div class="btn-group">
         <button class="btn btn-outline" onclick="location.href='/registro.html'">${icon("arrow-left")} Voltar</button>
         ${sub.status==="pending"?`
+          <button class="btn btn-primary" id="btnAnalysis">${icon("search")} Análise</button>`:""}
+        ${sub.status==="analysis"?`
           <button class="btn btn-success" id="btnApprove">${icon("check")} Aprovar</button>
           <button class="btn btn-danger"  id="btnReject">${icon("x")} Recusar</button>`:""}
         ${canDelete?`<button class="btn btn-danger" id="btnDelete" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c)">${icon("trash")} Excluir formulário</button>`:""}
@@ -93,6 +95,8 @@ function render(){
 
   const a=document.getElementById("btnApprove"),r=document.getElementById("btnReject");
   if(a)a.onclick=()=>decide("approved");
+  const an=document.getElementById("btnAnalysis");
+  if(an)an.onclick=async()=>{ try{ await updateStatusSupabase(sub.id,"analysis"); }catch(e){ console.warn(e); } sub.status="analysis"; toast("Inscrição em análise","success"); render(); };
   if(r)r.onclick=()=>decide("rejected");
 
   const del=document.getElementById("btnDelete");

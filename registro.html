@@ -101,7 +101,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/assets/app.js"></script>
 <script>
-const SERVIDORES = ["Servidor 1","Servidor 2","Servidor 3","Servidor 4","Servidor 5"];
+const SERVIDORES = ["Servidor 1","Servidor 2","Servidor 3"];
 let filterServer="";
 let searchEmail="";
 let allSubs=[];
@@ -157,6 +157,7 @@ async function fetchAll(){
 function render(){
   const restrictedServer = CURRENT_SERVIDOR; // forces filter
   const list=allSubs.filter(s=>{
+    if(!SERVIDORES.includes(s.servidor)) return false;
     if(restrictedServer && s.servidor !== restrictedServer) return false;
     if(filterServer && s.servidor!==filterServer) return false;
     if(searchEmail && !(s.email||"").toLowerCase().includes(searchEmail.toLowerCase())) return false;
@@ -446,7 +447,7 @@ function openAddModal(role, onDone){
   setTimeout(()=>wrap.querySelector("#newEmail").focus(), 50);
 }
 
-function labelStatus(s){return {pending:"Pendente",approved:"Aprovado",rejected:"Recusado"}[s]||s}
+function labelStatus(s){return {pending:"Pendente",analysis:"Em análise",approved:"Aprovado",rejected:"Recusado"}[s]||s}
 
 bootstrap();
 </script>
